@@ -1,0 +1,36 @@
+{
+  "regionId": "kr_seoul",
+  "regionName": "서울특별시",
+  "bins": [
+   { "id": "general", "name": "일반쓰레기", "color": "0x4CAF50" },
+    { "id": "recycle", "name": "재활용", "color": "0x2196F3" },
+    { "id": "food", "name": "음식물", "color": "0xFFC107" }
+  ],
+  "problems": [
+    {
+      "question": "서울에서 1회용 컵은 어떻게 버려야 할까요?",
+      "answer": "general",
+      "explanation": "1회용 컵은 일반쓰레기로 버려야 합니다. 재활용이 불가능합니다."
+    },
+    {
+      "question": "서울에서 생선 뼈는 어떻게 버려야 할까요?",
+      "answer": "food",
+      "explanation": "생선 뼈는 음식물 쓰레기로 분류됩니다. 물기를 최대한 제거한 후 버려주세요."
+    },
+    {
+      "question": "서울에서 종이팩은 어떻게 버려야 할까요?",
+      "answer": "recycle",
+      "explanation": "종이팩은 재활용이 가능합니다. 내용물을 비우고 깨끗이 헹군 후 재활용으로 버려주세요."
+    },
+    {
+      "question": "서울에서 스티로폼 용기는 어떻게 버려야 할까요?",
+      "answer": "recycle",
+      "explanation": "깨끗한 스티로폼 용기는 재활용이 가능합니다. 이물질을 제거하고 버려주세요."
+    },
+    {
+      "question": "서울에서 일회용 기저귀는 어떻게 버려야 할까요?",
+      "answer": "general",
+      "explanation": "일회용 기저귀는 일반쓰레기로 버려야 합니다. 변기로 배출하지 마세요."
+    }
+  ]
+}

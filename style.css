@@ -1,0 +1,141 @@
+/* style.css */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body { 
+    margin: 0; 
+    padding: 0;
+    overflow: hidden; 
+    font-family: 'Noto Sans KR', sans-serif;
+    background-color: #000;
+    color: #fff;
+    width: 100vw;
+    height: 100vh;
+}
+
+#gameContainer {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1;
+}
+
+#scoreBox {
+    position: fixed;
+    top: 20px;
+    left: 20px;
+    color: white;
+    background: rgba(0, 0, 0, 0.7);
+    padding: 10px 20px;
+    border-radius: 10px;
+    z-index: 1000;
+    font-size: 18px;
+    font-weight: bold;
+    display: none;
+}
+
+#questionPanel {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.7);
+    color: white;
+    padding: 15px 30px;
+    border-radius: 10px;
+    z-index: 1000;
+    text-align: center;
+    max-width: 80%;
+    box-sizing: border-box;
+}
+
+#intro, #ending {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background: rgba(0, 0, 0, 0.8);
+    z-index: 2000;
+}
+
+.container {
+    background: rgba(0, 0, 0, 0.8);
+    padding: 30px;
+    border-radius: 10px;
+    text-align: center;
+    max-width: 500px;
+    width: 90%;
+}
+
+h1 {
+    color: #4CAF50;
+    margin-bottom: 20px;
+}
+
+h2 {
+    margin-bottom: 20px;
+}
+
+p {
+    margin: 10px 0;
+}
+
+input, select, button {
+    margin: 10px 0;
+    padding: 12px;
+    width: 100%;
+    max-width: 300px;
+    border: none;
+    border-radius: 5px;
+    font-size: 16px;
+    font-family: 'Noto Sans KR', sans-serif;
+}
+
+button {
+    background: #4CAF50;
+    color: white;
+    cursor: pointer;
+    transition: background 0.3s;
+    font-weight: bold;
+}
+
+button:hover {
+    background: #45a049;
+}
+
+#ending {
+    display: none;
+}
+
+#incorrectAnswers {
+    margin: 20px 0;
+    max-height: 300px;
+    overflow-y: auto;
+    text-align: left;
+}
+
+#incorrectAnswers div {
+    margin: 10px 0;
+    padding: 10px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 5px;
+}
+
+#incorrectAnswers p {
+    margin: 5px 0;
+}
+
+#finalScore {
+    font-size: 24px;
+    font-weight: bold;
+    color: #4CAF50;
+}

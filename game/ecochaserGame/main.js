@@ -1,0 +1,2392 @@
+const state = {
+    scene: null,
+    camera: null,
+    renderer: null,
+    player: null,
+    lanes: [-4, 0, 4], // 3 레인 (왼/중/오)
+    playerLane: 1,
+    roadSegments: [],
+    roadLength: 80,
+    gameSpeed: 0.18,
+    environmentObjects: [],
+    isPlaying: false,
+    animationId: null,
+    score: 0,
+    gameTime: 0,
+    gameTimeLimit: 60, // 초
+    regionData: null,
+    currentProblem: null,
+    remainingProblems: [], // 이전 단일 세트 방식에서 사용 (현재는 미사용)
+    currentQuestionSprite: null, // 이전 단일 세트 방식에서 사용 (현재는 미사용)
+    bins: [], // 이전 단일 세트 방식에서 사용 (현재는 미사용)
+    problemSets: [], // 여러 문제 세트: { problem, questionSprite, bins: [{ mesh, label, id, name, lane }], resolved }
+    incorrectAnswers: [],
+    playerName: '',
+    language: 'ko',
+    trackEndZ: null,
+};
+
+function updateTierHud() {
+    const badge = document.getElementById('tierBadgeHud');
+    if (!badge) return;
+
+    const score = state.score || 0;
+
+    // 간단한 티어 계산 (getTierInfo와 동일한 기준)
+    let tierId = 'bronze';
+    let tierName = '브론즈';
+    if (score >= 400) {
+        tierId = 'diamond';
+        tierName = '다이아';
+    } else if (score >= 300) {
+        tierId = 'platinum';
+        tierName = '플래티넘';
+    } else if (score >= 200) {
+        tierId = 'gold';
+        tierName = '골드';
+    } else if (score >= 100) {
+        tierId = 'silver';
+        tierName = '실버';
+    }
+
+    badge.style.display = 'block';
+    // 요구사항: 상단에는 티어만 표시 (점수 숫자는 숨김)
+    badge.textContent = `${tierName}`;
+
+    let borderColor = '#795548';
+    if (tierId === 'silver') borderColor = '#b0bec5';
+    else if (tierId === 'gold') borderColor = '#ffd54f';
+    else if (tierId === 'platinum') borderColor = '#b3e5fc';
+    else if (tierId === 'diamond') borderColor = '#b39ddb';
+    badge.style.border = `1px solid ${borderColor}`;
+}
+
+// 간단한 UI 다국어(i18n) 문자열
+const i18n = {
+    ko: {
+        scoreLabel: '점수:',
+        timerLabel: '남은 시간:',
+        timerUnit: '초',
+        introDescription:
+            '위에서 내려다보는 도시 위로 달리면서, 쓰레기를 올바르게 분리수거하세요!',
+        introLanguageLabel: '언어',
+        introRegionLabel: '지역 선택',
+        playerNamePlaceholder: '이름을 입력하세요',
+        startButton: '게임 시작',
+        endingTitle: '게임 종료!',
+        rankingTitle: '🏆 랭킹',
+        finalScoreLabel: '최종 점수:',
+        finalScoreUnit: '점',
+        restartButton: '다시 시작',
+        noRecords: '아직 기록이 없습니다.',
+        rankingHeaderRank: '순위',
+        rankingHeaderName: '이름',
+        rankingHeaderScore: '점수',
+        rankingHeaderDate: '날짜',
+        rankingScoreSuffix: '점',
+        alertEnterName: '이름을 입력해주세요!',
+        feedbackCorrect: '정답입니다! +10점',
+        feedbackWrong: '틀렸습니다!',
+        wrongAnswerTitle: '틀린 문제:',
+        allCorrect: '모든 문제를 맞추셨습니다!',
+        questionPrefix: '문제',
+        selectedAnswerLabel: '선택한 답:',
+        correctAnswerLabel: '정답:',
+        explanationLabel: '설명:',
+        regionLabelSeoul: '서울특별시',
+        regionLabelBusan: '부산광역시',
+        regionLabelIncheon: '인천광역시',
+        regionLabelCheonan: '천안시',
+        // 로그인/회원가입 및 기타 UI
+        loginEmailPlaceholder: '이메일',
+        loginPasswordPlaceholder: '비밀번호',
+        signupEmailPlaceholder: '이메일',
+        signupPasswordPlaceholder: '비밀번호',
+        signupPasswordConfirmPlaceholder: '비밀번호 확인',
+        loginButton: '로그인',
+        signupButton: '회원가입',
+        forgotPasswordButton: '비밀번호 찾기',
+        signupConfirmButton: '확인',
+        exitConfirmButton: '확인',
+        exitCancelButton: '취소',
+        reviewTitle: '오답노트',
+        reviewRestartButton: '다시 시작',
+        reviewBackButton: '닫기',
+        rankingBackButton: '확인',
+        rankingButton: '랭킹 보기',
+        endingOkButton: '확인',
+    },
+    en: {
+        scoreLabel: 'Score:',
+        timerLabel: 'Time left:',
+        timerUnit: 's',
+        introDescription:
+            'Run through the city from a top-down view and sort the trash into the right bins!',
+        introLanguageLabel: 'Language',
+        introRegionLabel: 'Select Region',
+        playerNamePlaceholder: 'Enter your name',
+        startButton: 'Start Game',
+        endingTitle: 'Game Over!',
+        rankingTitle: '🏆 Ranking',
+        finalScoreLabel: 'Final Score:',
+        finalScoreUnit: 'pts',
+        restartButton: 'Play Again',
+        noRecords: 'No records yet.',
+        rankingHeaderRank: 'Rank',
+        rankingHeaderName: 'Name',
+        rankingHeaderScore: 'Score',
+        rankingHeaderDate: 'Date',
+        rankingScoreSuffix: 'pts',
+        alertEnterName: 'Please enter your name!',
+        feedbackCorrect: 'Correct! +10 pts',
+        feedbackWrong: 'Wrong!',
+        wrongAnswerTitle: 'Incorrect Questions:',
+        allCorrect: 'You answered all questions correctly!',
+        questionPrefix: 'Question',
+        selectedAnswerLabel: 'Your answer:',
+        correctAnswerLabel: 'Correct answer:',
+        explanationLabel: 'Explanation:',
+        regionLabelSeoul: 'Seoul',
+        regionLabelBusan: 'Busan',
+        regionLabelIncheon: 'Incheon',
+        regionLabelCheonan: 'Cheonan',
+        // 로그인/회원가입 및 기타 UI
+        loginEmailPlaceholder: 'Email',
+        loginPasswordPlaceholder: 'Password',
+        signupEmailPlaceholder: 'Email',
+        signupPasswordPlaceholder: 'Password',
+        signupPasswordConfirmPlaceholder: 'Confirm Password',
+        loginButton: 'Log In',
+        signupButton: 'Sign Up',
+        forgotPasswordButton: 'Forgot Password',
+        signupConfirmButton: 'Confirm',
+        exitConfirmButton: 'OK',
+        exitCancelButton: 'Cancel',
+        reviewTitle: 'Incorrect Answers',
+        reviewRestartButton: 'Play Again',
+        reviewBackButton: 'Close',
+        rankingBackButton: 'OK',
+        rankingButton: 'View Ranking',
+        endingOkButton: 'OK',
+    },
+};
+
+function t(key) {
+    const langTable = i18n[state.language] || i18n.ko;
+    return langTable[key] || key;
+}
+
+// 현재 선택된 언어를 UI에 반영
+function applyLanguageToUI() {
+    const scoreLabelEl = document.getElementById('scoreLabel');
+    if (scoreLabelEl) scoreLabelEl.textContent = t('scoreLabel');
+
+    const timerLabelEl = document.getElementById('timerLabel');
+    if (timerLabelEl) timerLabelEl.textContent = t('timerLabel');
+
+    const timerUnitEl = document.getElementById('timeUnit');
+    if (timerUnitEl) timerUnitEl.textContent = t('timerUnit');
+
+    const introDescEl = document.getElementById('introDescription');
+    if (introDescEl) introDescEl.textContent = t('introDescription');
+
+    // 인트로 언어/지역 라벨
+    const introLanguageLabelEl = document.querySelector('label[for="languageSelect"]');
+    if (introLanguageLabelEl) introLanguageLabelEl.textContent = t('introLanguageLabel');
+
+    const introRegionLabelEl = document.querySelector('label[for="regionSelect"]');
+    if (introRegionLabelEl) introRegionLabelEl.textContent = t('introRegionLabel');
+
+    const playerNameInput = document.getElementById('playerName');
+    if (playerNameInput) playerNameInput.placeholder = t('playerNamePlaceholder');
+
+    // 로그인/회원가입 입력창 placeholder
+    const loginEmailInput = document.getElementById('loginEmail');
+    if (loginEmailInput) loginEmailInput.placeholder = t('loginEmailPlaceholder');
+
+    const loginPasswordInput = document.getElementById('loginPassword');
+    if (loginPasswordInput) loginPasswordInput.placeholder = t('loginPasswordPlaceholder');
+
+    const signupEmailInput = document.getElementById('signupEmail');
+    if (signupEmailInput) signupEmailInput.placeholder = t('signupEmailPlaceholder');
+
+    const signupPasswordInput = document.getElementById('signupPassword');
+    if (signupPasswordInput) signupPasswordInput.placeholder = t('signupPasswordPlaceholder');
+
+    const signupPasswordConfirmInput = document.getElementById('signupPasswordConfirm');
+    if (signupPasswordConfirmInput)
+        signupPasswordConfirmInput.placeholder = t('signupPasswordConfirmPlaceholder');
+
+    const endingTitleEl = document.getElementById('endingTitle');
+    if (endingTitleEl) endingTitleEl.textContent = t('endingTitle');
+
+    const rankingTitleEl = document.getElementById('rankingTitle');
+    if (rankingTitleEl) rankingTitleEl.textContent = t('rankingTitle');
+
+    const finalScoreLabelEl = document.getElementById('finalScoreLabel');
+    if (finalScoreLabelEl) finalScoreLabelEl.textContent = t('finalScoreLabel');
+
+    const finalScoreUnitEl = document.getElementById('finalScoreUnit');
+    if (finalScoreUnitEl) finalScoreUnitEl.textContent = t('finalScoreUnit');
+
+    const restartBtn = document.getElementById('restartBtn');
+    if (restartBtn) restartBtn.textContent = t('restartButton');
+
+    // 엔딩 화면의 확인/랭킹 버튼
+    const endingOkBtn = document.getElementById('reviewBtn');
+    if (endingOkBtn) endingOkBtn.textContent = t('endingOkButton');
+
+    const endingRankingBtn = document.getElementById('rankingBtn');
+    if (endingRankingBtn) endingRankingBtn.textContent = t('rankingButton');
+
+    // 지역 셀렉트 박스 옵션 라벨
+    const regionSelect = document.getElementById('regionSelect');
+    if (regionSelect) {
+        Array.from(regionSelect.options).forEach((opt) => {
+            switch (opt.value) {
+                case 'regions/kr_seoul.json':
+                    opt.textContent = t('regionLabelSeoul');
+                    break;
+                case 'regions/kr_busan.json':
+                    opt.textContent = t('regionLabelBusan');
+                    break;
+                case 'regions/kr_incheon.json':
+                    opt.textContent = t('regionLabelIncheon');
+                    break;
+                case 'regions/kr_cheonan.json':
+                    opt.textContent = t('regionLabelCheonan');
+                    break;
+                default:
+                    break;
+            }
+        });
+    }
+
+    // 리뷰/랭킹 화면 버튼 및 제목
+    const reviewTitleEl = document.querySelector('#review h2');
+    if (reviewTitleEl) reviewTitleEl.textContent = t('reviewTitle');
+
+    const reviewRestartBtn = document.getElementById('reviewRestartBtn');
+    if (reviewRestartBtn) reviewRestartBtn.textContent = t('reviewRestartButton');
+
+    const reviewBackBtn = document.getElementById('reviewBackBtn');
+    if (reviewBackBtn) reviewBackBtn.textContent = t('reviewBackButton');
+
+    const rankingBackBtn = document.getElementById('rankingBackBtn');
+    if (rankingBackBtn) rankingBackBtn.textContent = t('rankingBackButton');
+
+    // 로그인/회원가입 버튼들
+    const loginBtn = document.getElementById('loginBtn');
+    if (loginBtn) loginBtn.textContent = t('loginButton');
+
+    const signupBtn = document.getElementById('signupBtn');
+    if (signupBtn) signupBtn.textContent = t('signupButton');
+
+    const forgotPasswordBtn = document.getElementById('forgotPasswordBtn');
+    if (forgotPasswordBtn) forgotPasswordBtn.textContent = t('forgotPasswordButton');
+
+    const signupConfirmBtn = document.getElementById('signupConfirmBtn');
+    if (signupConfirmBtn) signupConfirmBtn.textContent = t('signupConfirmButton');
+
+    // 종료 모달 버튼
+    const exitConfirmBtn = document.getElementById('exitConfirmBtn');
+    if (exitConfirmBtn) exitConfirmBtn.textContent = t('exitConfirmButton');
+
+    const exitCancelBtn = document.getElementById('exitCancelBtn');
+    if (exitCancelBtn) exitCancelBtn.textContent = t('exitCancelButton');
+}
+
+function createEndBarrier(z) {
+    const group = new THREE.Group();
+
+    const wallGeo = new THREE.BoxGeometry(40, 14, 4);
+    const wallMat = new THREE.MeshStandardMaterial({
+        color: 0x263238,
+        roughness: 0.8,
+        metalness: 0.1,
+    });
+    const wall = new THREE.Mesh(wallGeo, wallMat);
+    wall.position.set(0, 7, z);
+    wall.castShadow = true;
+    wall.receiveShadow = true;
+    group.add(wall);
+
+    const stripeGeo = new THREE.BoxGeometry(40.2, 0.6, 0.4);
+    const stripeMat = new THREE.MeshStandardMaterial({ color: 0x90caf9 });
+    const stripe = new THREE.Mesh(stripeGeo, stripeMat);
+    stripe.position.set(0, 10, z + 0.01);
+    group.add(stripe);
+
+    state.scene.add(group);
+    state.environmentObjects.push(group);
+}
+
+// Three.js 초기화
+function initThreeJS() {
+    state.scene = new THREE.Scene();
+    state.scene.background = new THREE.Color(0x87CEEB);
+
+    // 캐릭터 뒤쪽·위에서 보는 시작 위치
+    const aspect = window.innerWidth / window.innerHeight;
+    state.camera = new THREE.PerspectiveCamera(60, aspect, 0.1, 1000);
+    state.camera.position.set(0, 8, -15);
+    state.camera.lookAt(0, 2, 20);
+
+    const container = document.getElementById('gameContainer');
+    state.renderer = new THREE.WebGLRenderer({ antialias: true });
+    state.renderer.setSize(container.clientWidth, container.clientHeight);
+    state.renderer.shadowMap.enabled = true;
+    container.appendChild(state.renderer.domElement);
+
+    const ambient = new THREE.AmbientLight(0xffffff, 0.8);
+    state.scene.add(ambient);
+
+    const dir = new THREE.DirectionalLight(0xffffff, 0.7);
+    dir.position.set(10, 30, 10);
+    dir.castShadow = true;
+    state.scene.add(dir);
+}
+
+// 무한 도로 생성
+function createRoad() {
+    const roadGeo = new THREE.PlaneGeometry(16, state.roadLength);
+    const roadMat = new THREE.MeshStandardMaterial({
+        color: 0x707070, // 회색 도로
+        roughness: 0.7,
+        side: THREE.DoubleSide,
+    });
+
+    for (let i = 0; i < 3; i++) {
+        const road = new THREE.Mesh(roadGeo, roadMat);
+        road.rotation.x = -Math.PI / 2;
+        road.position.set(0, 0, i * state.roadLength);
+        road.receiveShadow = true;
+        state.scene.add(road);
+        state.roadSegments.push(road);
+    }
+
+    // 중앙선 & 레인 라인
+    const lineGeo = new THREE.PlaneGeometry(0.2, 4);
+    const laneMat = new THREE.MeshStandardMaterial({
+        color: 0xffffff,
+        side: THREE.DoubleSide,
+    });
+
+    // 차선 표시 범위를 한 번 더 늘려 도로가 더 멀리까지 보이도록 함
+    for (let z = 0; z < state.roadLength * 10; z += 6) {
+        const left = new THREE.Mesh(lineGeo, laneMat);
+        left.rotation.x = -Math.PI / 2;
+        left.position.set(-2, 0.01, z);
+        state.scene.add(left);
+
+        const right = new THREE.Mesh(lineGeo, laneMat);
+        right.rotation.x = -Math.PI / 2;
+        right.position.set(2, 0.01, z);
+        state.scene.add(right);
+    }
+    
+    // 배경 요소 추가
+    createEnvironment();
+}
+
+// 배경 환경 생성 (나무, 건물, 구름 등)
+function createEnvironment() {
+    // 트랙 끝 기준으로 더 큰 여유를 두어 도로와 배경이 충분히 길게 느껴지도록 함
+    const baseLength = state.trackEndZ && state.trackEndZ > 0 ? state.trackEndZ + 260 : state.roadLength * 14;
+    const envLength = baseLength;
+    // 잔디 바닥 (도로 양옆)
+    const grassGeo = new THREE.PlaneGeometry(30, envLength);
+    const grassMat = new THREE.MeshStandardMaterial({
+        color: 0x4a8c2a, // 진한 초록색 잔디
+        roughness: 0.9,
+        side: THREE.DoubleSide,
+    });
+    
+    // 왼쪽 잔디
+    const grassLeft = new THREE.Mesh(grassGeo, grassMat);
+    grassLeft.rotation.x = -Math.PI / 2;
+    grassLeft.position.set(-23, -0.01, envLength / 2);
+    grassLeft.receiveShadow = true;
+    state.scene.add(grassLeft);
+    
+    // 오른쪽 잔디
+    const grassRight = new THREE.Mesh(grassGeo, grassMat);
+    grassRight.rotation.x = -Math.PI / 2;
+    grassRight.position.set(23, -0.01, envLength / 2);
+    grassRight.receiveShadow = true;
+    state.scene.add(grassRight);
+    
+    // 나무 생성
+    for (let i = 0; i < 30; i++) {
+        const z = Math.random() * envLength - 20;
+        const side = Math.random() > 0.5 ? 1 : -1;
+        const x = side * (10 + Math.random() * 10);
+        createTree(x, z);
+    }
+    
+    // 건물 생성
+    for (let i = 0; i < 12; i++) {
+        const z = i * (envLength / 10) - 20;
+        const side = Math.random() > 0.5 ? 1 : -1;
+        const x = side * (18 + Math.random() * 8);
+        const height = 8 + Math.random() * 12;
+        createBuilding(x, z, height);
+    }
+    
+    // 구름 생성
+    for (let i = 0; i < 15; i++) {
+        const x = (Math.random() - 0.5) * 100;
+        const y = 25 + Math.random() * 15;
+        const z = Math.random() * state.roadLength * 3 - 20;
+        createCloud(x, y, z);
+    }
+    
+    // 도로 표지판
+    for (let i = 0; i < 6; i++) {
+        const z = i * 40;
+        createRoadSign(-9, z);
+        createRoadSign(9, z + 20);
+    }
+    
+    // 분리수거 테마 요소들 추가
+    
+    // 재활용 마크 조형물 (도로변에)
+    for (let i = 0; i < 4; i++) {
+        const z = i * 60 + 30;
+        const side = Math.random() > 0.5 ? 1 : -1;
+        createRecycleSymbol(side * 12, z);
+    }
+    
+    // 가로등 (태양광 패널 부착) - 도로와 충분히 떨어진 위치에 배치
+    for (let i = 0; i < Math.ceil(envLength / 20); i++) {
+        const z = i * 20 - 10;
+        // 도로 레인(-4, 0, 4)과 겹치지 않게 조금 더 바깥쪽에 배치
+        createSolarStreetLight(-11, z);
+        createSolarStreetLight(11, z + 10);
+    }
+
+    // 공원 벤치 & 쓰레기통 세트
+    for (let i = 0; i < Math.ceil(envLength / 50); i++) {
+        const z = i * 50 + 20;
+        const side = Math.random() > 0.5 ? 1 : -1;
+        createParkBenchSet(side * 11, z);
+    }
+
+    // 재활용 센터 미니 건물
+    createRecycleCenter(25, envLength * 0.35);
+    createRecycleCenter(-25, envLength * 0.65);
+    
+    // 환경 보호 광고판
+    for (let i = 0; i < 6; i++) {
+        const z = i * (envLength / 6) + 40;
+        const side = i % 2 === 0 ? 1 : -1;
+        createEcoBillboard(side * 15, z);
+    }
+    
+    // 풍력 발전기 (멀리, 도로와 충분히 떨어진 위치에 배치)
+    // 도로 레인(-4, 0, 4)에서 한참 벗어나도록 x 좌표를 크게 잡음
+    createWindTurbine(-40, envLength * 0.5);
+    createWindTurbine(40, envLength * 0.6);
+    
+    // 화단 (도로변 꽃)
+    for (let i = 0; i < Math.ceil(envLength / 25); i++) {
+        const z = i * 25;
+        const side = Math.random() > 0.5 ? 1 : -1;
+        createFlowerBed(side * 9.5, z);
+    }
+
+    // 도로 끝을 막는 건물 배리어는 사용하지 않음 (도로를 열린 형태로 유지)
+}
+
+// 나무 생성
+function createTree(x, z) {
+    const tree = new THREE.Group();
+    
+    // 나무 줄기
+    const trunkGeo = new THREE.CylinderGeometry(0.3, 0.4, 3, 8);
+    const trunkMat = new THREE.MeshStandardMaterial({ color: 0x8b4513 });
+    const trunk = new THREE.Mesh(trunkGeo, trunkMat);
+    trunk.position.y = 1.5;
+    trunk.castShadow = true;
+    tree.add(trunk);
+    
+    // 나뭇잎 (원뿔 3개 겹치기)
+    const foliageGeo = new THREE.ConeGeometry(1.5, 3, 8);
+    const foliageMat = new THREE.MeshStandardMaterial({ color: 0x2d5016 });
+    
+    const foliage1 = new THREE.Mesh(foliageGeo, foliageMat);
+    foliage1.position.y = 4;
+    foliage1.castShadow = true;
+    tree.add(foliage1);
+    
+    const foliage2 = new THREE.Mesh(foliageGeo, foliageMat);
+    foliage2.position.y = 5.5;
+    foliage2.scale.set(0.8, 0.8, 0.8);
+    foliage2.castShadow = true;
+    tree.add(foliage2);
+    
+    const foliage3 = new THREE.Mesh(foliageGeo, foliageMat);
+    foliage3.position.y = 6.5;
+    foliage3.scale.set(0.6, 0.6, 0.6);
+    foliage3.castShadow = true;
+    tree.add(foliage3);
+    
+    tree.position.set(x, 0, z);
+    state.scene.add(tree);
+    state.environmentObjects.push(tree);
+}
+
+// 건물 생성
+function createBuilding(x, z, height) {
+    const building = new THREE.Group();
+    
+    // 다양한 건물 색상 배열 (환경 친화적인 파스텔톤)
+    const buildingColors = [
+        0xe8f5e9, // 연한 초록
+        0xe3f2fd, // 연한 파랑
+        0xfff3e0, // 연한 주황
+        0xf3e5f5, // 연한 보라
+        0xfce4ec, // 연한 핑크
+        0xe0f2f1, // 연한 청록
+    ];
+    
+    const buildingColor = buildingColors[Math.floor(Math.random() * buildingColors.length)];
+    
+    // 메인 건물
+    const buildingGeo = new THREE.BoxGeometry(4, height, 4);
+    const buildingMat = new THREE.MeshStandardMaterial({
+        color: buildingColor,
+        roughness: 0.7,
+        metalness: 0.1,
+    });
+    const buildingMesh = new THREE.Mesh(buildingGeo, buildingMat);
+    buildingMesh.position.y = height / 2;
+    buildingMesh.castShadow = true;
+    buildingMesh.receiveShadow = true;
+    building.add(buildingMesh);
+    
+    // 옥상 테두리
+    const roofEdgeGeo = new THREE.BoxGeometry(4.2, 0.3, 4.2);
+    const roofEdgeMat = new THREE.MeshStandardMaterial({
+        color: new THREE.Color(buildingColor).multiplyScalar(0.7),
+    });
+    const roofEdge = new THREE.Mesh(roofEdgeGeo, roofEdgeMat);
+    roofEdge.position.y = height;
+    building.add(roofEdge);
+    
+    // 입구 (1층 중앙)
+    const entranceGeo = new THREE.BoxGeometry(1.2, 2, 0.1);
+    const entranceMat = new THREE.MeshStandardMaterial({
+        color: 0x795548, // 갈색 문
+        roughness: 0.8,
+    });
+    const entrance = new THREE.Mesh(entranceGeo, entranceMat);
+    entrance.position.set(0, 1, 2.05);
+    building.add(entrance);
+    
+    // 창문들
+    const windowGeo = new THREE.BoxGeometry(0.6, 0.8, 0.15);
+    const windowColors = [
+        { base: 0x64b5f6, emissive: 0x1976d2 }, // 파랑
+        { base: 0x81c784, emissive: 0x388e3c }, // 초록
+        { base: 0xffb74d, emissive: 0xf57c00 }, // 주황
+    ];
+    const windowColor = windowColors[Math.floor(Math.random() * windowColors.length)];
+    
+    const windowMat = new THREE.MeshStandardMaterial({
+        color: windowColor.base,
+        emissive: windowColor.emissive,
+        emissiveIntensity: 0.4,
+        roughness: 0.2,
+        metalness: 0.5,
+    });
+    
+    const floors = Math.floor(height / 2);
+    // 앞면 창문
+    for (let f = 1; f < floors; f++) { // 1층은 입구가 있으므로 제외
+        for (let w = 0; w < 3; w++) {
+            if (f === 1 && w === 1) continue; // 입구 위치 피하기
+            
+            const window1 = new THREE.Mesh(windowGeo, windowMat);
+            window1.position.set(
+                (w - 1) * 1.2,
+                f * 2 + 1,
+                2.05
+            );
+            building.add(window1);
+            
+            // 창틀
+            const frameGeo = new THREE.BoxGeometry(0.7, 0.9, 0.1);
+            const frameMat = new THREE.MeshStandardMaterial({
+                color: 0xffffff,
+            });
+            const frame = new THREE.Mesh(frameGeo, frameMat);
+            frame.position.set(
+                (w - 1) * 1.2,
+                f * 2 + 1,
+                2.0
+            );
+            building.add(frame);
+        }
+    }
+    
+    // 옆면 창문 (간단히)
+    for (let f = 1; f < floors; f++) {
+        const sideWindow1 = new THREE.Mesh(windowGeo, windowMat);
+        sideWindow1.position.set(2.05, f * 2 + 1, 0);
+        sideWindow1.rotation.y = Math.PI / 2;
+        building.add(sideWindow1);
+        
+        const sideWindow2 = new THREE.Mesh(windowGeo, windowMat);
+        sideWindow2.position.set(-2.05, f * 2 + 1, 0);
+        sideWindow2.rotation.y = Math.PI / 2;
+        building.add(sideWindow2);
+    }
+    
+    // 에어컨 실외기 (랜덤 배치)
+    if (Math.random() > 0.5) {
+        const acGeo = new THREE.BoxGeometry(0.3, 0.2, 0.4);
+        const acMat = new THREE.MeshStandardMaterial({ color: 0xbdbdbd });
+        const ac = new THREE.Mesh(acGeo, acMat);
+        ac.position.set(1.5, height * 0.3, 2.2);
+        building.add(ac);
+    }
+    
+    // 옥상 안테나/위성접시
+    if (Math.random() > 0.6) {
+        const antennaGroup = new THREE.Group();
+        
+        // 안테나 기둥
+        const poleGeo = new THREE.CylinderGeometry(0.05, 0.05, 1.5, 6);
+        const poleMat = new THREE.MeshStandardMaterial({ color: 0x424242 });
+        const pole = new THREE.Mesh(poleGeo, poleMat);
+        pole.position.y = 0.75;
+        antennaGroup.add(pole);
+        
+        // 접시
+        const dishGeo = new THREE.SphereGeometry(0.3, 8, 8, 0, Math.PI * 2, 0, Math.PI / 2);
+        const dishMat = new THREE.MeshStandardMaterial({ 
+            color: 0xeeeeee,
+            metalness: 0.8,
+            roughness: 0.2,
+        });
+        const dish = new THREE.Mesh(dishGeo, dishMat);
+        dish.position.y = 1.5;
+        dish.rotation.x = Math.PI / 4;
+        antennaGroup.add(dish);
+        
+        antennaGroup.position.set(
+            (Math.random() - 0.5) * 1.5,
+            height,
+            (Math.random() - 0.5) * 1.5
+        );
+        building.add(antennaGroup);
+    }
+    
+    // 발코니 (중간층에)
+    const balconyFloor = Math.floor(floors / 2);
+    if (floors > 3 && Math.random() > 0.4) {
+        for (let w = 0; w < 3; w++) {
+            const balconyGeo = new THREE.BoxGeometry(0.8, 0.05, 0.4);
+            const balconyMat = new THREE.MeshStandardMaterial({
+                color: new THREE.Color(buildingColor).multiplyScalar(0.8),
+            });
+            const balcony = new THREE.Mesh(balconyGeo, balconyMat);
+            balcony.position.set(
+                (w - 1) * 1.2,
+                balconyFloor * 2 + 0.5,
+                2.25
+            );
+            building.add(balcony);
+            
+            // 발코니 난간
+            const railingGeo = new THREE.BoxGeometry(0.8, 0.3, 0.02);
+            const railingMat = new THREE.MeshStandardMaterial({ color: 0x757575 });
+            const railing = new THREE.Mesh(railingGeo, railingMat);
+            railing.position.set(
+                (w - 1) * 1.2,
+                balconyFloor * 2 + 0.8,
+                2.45
+            );
+            building.add(railing);
+        }
+    }
+    
+    // 건물 외벽 라인 장식 (수평선)
+    for (let i = 1; i <= 3; i++) {
+        const lineHeight = (height / 4) * i;
+        const lineGeo = new THREE.BoxGeometry(4.1, 0.1, 4.1);
+        const lineMat = new THREE.MeshStandardMaterial({
+            color: new THREE.Color(buildingColor).multiplyScalar(0.85),
+        });
+        const line = new THREE.Mesh(lineGeo, lineMat);
+        line.position.y = lineHeight;
+        building.add(line);
+    }
+    
+    // 간판 (일부 건물에만)
+    if (Math.random() > 0.6) {
+        const signGeo = new THREE.BoxGeometry(2, 0.5, 0.1);
+        const signColors = [0xff6b6b, 0x4ecdc4, 0xffe66d, 0x95e1d3];
+        const signColor = signColors[Math.floor(Math.random() * signColors.length)];
+        const signMat = new THREE.MeshStandardMaterial({
+            color: signColor,
+            emissive: signColor,
+            emissiveIntensity: 0.5,
+        });
+        const sign = new THREE.Mesh(signGeo, signMat);
+        sign.position.set(0, height * 0.2, 2.1);
+        building.add(sign);
+    }
+    
+    // 옥상 정원 (일부 건물에)
+    if (Math.random() > 0.7) {
+        // 나무 화분들
+        for (let i = 0; i < 3; i++) {
+            const potGeo = new THREE.CylinderGeometry(0.15, 0.15, 0.2, 8);
+            const potMat = new THREE.MeshStandardMaterial({ color: 0x8d6e63 });
+            const pot = new THREE.Mesh(potGeo, potMat);
+            pot.position.set(
+                (Math.random() - 0.5) * 2,
+                height + 0.1,
+                (Math.random() - 0.5) * 2
+            );
+            building.add(pot);
+            
+            // 작은 나무
+            const treeGeo = new THREE.ConeGeometry(0.2, 0.5, 6);
+            const treeMat = new THREE.MeshStandardMaterial({ color: 0x4caf50 });
+            const tree = new THREE.Mesh(treeGeo, treeMat);
+            tree.position.set(
+                pot.position.x,
+                height + 0.4,
+                pot.position.z
+            );
+            building.add(tree);
+        }
+    }
+    
+    // 건물 코너 기둥 장식
+    const pillarGeo = new THREE.BoxGeometry(0.15, height, 0.15);
+    const pillarMat = new THREE.MeshStandardMaterial({
+        color: new THREE.Color(buildingColor).multiplyScalar(0.6),
+        roughness: 0.8,
+    });
+    
+    const corners = [
+        [1.93, 1.93],
+        [-1.93, 1.93],
+        [1.93, -1.93],
+        [-1.93, -1.93]
+    ];
+    
+    corners.forEach(([cx, cz]) => {
+        const pillar = new THREE.Mesh(pillarGeo, pillarMat);
+        pillar.position.set(cx, height / 2, cz);
+        building.add(pillar);
+    });
+    
+    building.position.set(x, 0, z);
+    state.scene.add(building);
+    state.environmentObjects.push(building);
+}
+
+// 구름 생성
+function createCloud(x, y, z) {
+    const cloud = new THREE.Group();
+    const cloudMat = new THREE.MeshStandardMaterial({
+        color: 0xffffff,
+        transparent: true,
+        opacity: 0.8,
+    });
+    
+    // 여러 구체로 구름 만들기
+    for (let i = 0; i < 5; i++) {
+        const sphereGeo = new THREE.SphereGeometry(1 + Math.random() * 0.5, 8, 8);
+        const sphere = new THREE.Mesh(sphereGeo, cloudMat);
+        sphere.position.set(
+            (Math.random() - 0.5) * 3,
+            (Math.random() - 0.5) * 1,
+            (Math.random() - 0.5) * 2
+        );
+        cloud.add(sphere);
+    }
+    
+    cloud.position.set(x, y, z);
+    state.scene.add(cloud);
+    state.environmentObjects.push(cloud);
+}
+
+// 재활용 마크 조형물
+function createRecycleSymbol(x, z) {
+    const group = new THREE.Group();
+    
+    // 받침대
+    const baseGeo = new THREE.CylinderGeometry(0.8, 0.9, 0.3, 8);
+    const baseMat = new THREE.MeshStandardMaterial({ color: 0x757575 });
+    const base = new THREE.Mesh(baseGeo, baseMat);
+    base.position.y = 0.15;
+    group.add(base);
+    
+    // 재활용 마크 (3개의 화살표를 원형으로)
+    const arrowMat = new THREE.MeshStandardMaterial({
+        color: 0x4caf50,
+        emissive: 0x2e7d32,
+        emissiveIntensity: 0.3,
+    });
+    
+    for (let i = 0; i < 3; i++) {
+        const arrow = new THREE.Group();
+        
+        // 화살표 몸통
+        const bodyGeo = new THREE.BoxGeometry(0.15, 0.6, 0.1);
+        const body = new THREE.Mesh(bodyGeo, arrowMat);
+        body.position.y = 0.3;
+        arrow.add(body);
+        
+        // 화살표 머리
+        const headGeo = new THREE.ConeGeometry(0.2, 0.3, 3);
+        const head = new THREE.Mesh(headGeo, arrowMat);
+        head.position.y = 0.75;
+        head.rotation.z = Math.PI;
+        arrow.add(head);
+        
+        arrow.rotation.y = (i * Math.PI * 2) / 3;
+        arrow.position.y = 1.5;
+        arrow.rotation.x = Math.PI / 6;
+        group.add(arrow);
+    }
+    
+    group.position.set(x, 0, z);
+    state.scene.add(group);
+    state.environmentObjects.push(group);
+}
+
+// 점수 이펙트 표시 (+10 / -10)
+function showScoreEffect(amount) {
+    const el = document.getElementById('scoreEffect');
+    if (!el) return;
+
+    el.textContent = amount > 0 ? `+${amount}` : `${amount}`;
+
+    el.classList.remove('negative');
+    if (amount < 0) {
+        el.classList.add('negative');
+    }
+
+    el.classList.remove('show');
+    // 리플로우 강제해서 애니메이션 재적용
+    void el.offsetWidth;
+    el.classList.add('show');
+}
+
+// 태양광 가로등
+function createSolarStreetLight(x, z) {
+    const group = new THREE.Group();
+    
+    // 기둥
+    const poleGeo = new THREE.CylinderGeometry(0.08, 0.1, 4, 8);
+    const poleMat = new THREE.MeshStandardMaterial({ color: 0x616161 });
+    const pole = new THREE.Mesh(poleGeo, poleMat);
+    pole.position.y = 2;
+    group.add(pole);
+    
+    // 태양광 패널
+    const panelGeo = new THREE.BoxGeometry(0.6, 0.05, 0.4);
+    const panelMat = new THREE.MeshStandardMaterial({
+        color: 0x1a237e,
+        metalness: 0.8,
+        roughness: 0.2,
+    });
+    const panel = new THREE.Mesh(panelGeo, panelMat);
+    panel.position.y = 4.2;
+    panel.rotation.x = -Math.PI / 6;
+    group.add(panel);
+    
+    // 조명
+    const lightGeo = new THREE.BoxGeometry(0.3, 0.15, 0.3);
+    const lightMat = new THREE.MeshStandardMaterial({
+        color: 0xffffff,
+        emissive: 0xffeb3b,
+        emissiveIntensity: 0.5,
+    });
+    const light = new THREE.Mesh(lightGeo, lightMat);
+    light.position.y = 3.8;
+    group.add(light);
+    
+    group.position.set(x, 0, z);
+    state.scene.add(group);
+}
+
+// 공원 벤치 & 쓰레기통 세트
+function createParkBenchSet(x, z) {
+    const group = new THREE.Group();
+    
+    // 벤치
+    const benchBackGeo = new THREE.BoxGeometry(1.5, 0.6, 0.1);
+    const benchMat = new THREE.MeshStandardMaterial({ color: 0x8d6e63 });
+    const benchBack = new THREE.Mesh(benchBackGeo, benchMat);
+    benchBack.position.set(0, 0.8, -0.3);
+    group.add(benchBack);
+    
+    const benchSeatGeo = new THREE.BoxGeometry(1.5, 0.1, 0.5);
+    const benchSeat = new THREE.Mesh(benchSeatGeo, benchMat);
+    benchSeat.position.set(0, 0.5, -0.15);
+    group.add(benchSeat);
+    
+    // 벤치 다리
+    const legGeo = new THREE.BoxGeometry(0.1, 0.5, 0.1);
+    const legPositions = [[-0.6, -0.4], [0.6, -0.4], [-0.6, 0.1], [0.6, 0.1]];
+    legPositions.forEach(([lx, lz]) => {
+        const leg = new THREE.Mesh(legGeo, benchMat);
+        leg.position.set(lx, 0.25, lz);
+        group.add(leg);
+    });
+    
+    // 작은 쓰레기통
+    const binGeo = new THREE.CylinderGeometry(0.2, 0.18, 0.5, 8);
+    const binMat = new THREE.MeshStandardMaterial({ color: 0x4caf50 });
+    const bin = new THREE.Mesh(binGeo, binMat);
+    bin.position.set(1.2, 0.25, 0);
+    group.add(bin);
+    
+    group.position.set(x, 0, z);
+    state.scene.add(group);
+}
+
+// 재활용 센터
+function createRecycleCenter(x, z) {
+    const group = new THREE.Group();
+    
+    // 건물
+    const buildingGeo = new THREE.BoxGeometry(6, 4, 5);
+    const buildingMat = new THREE.MeshStandardMaterial({
+        color: 0xe8f5e9,
+        roughness: 0.7,
+    });
+    const building = new THREE.Mesh(buildingGeo, buildingMat);
+    building.position.y = 2;
+    building.castShadow = true;
+    group.add(building);
+    
+    // 지붕
+    const roofGeo = new THREE.ConeGeometry(4.5, 1.5, 4);
+    const roofMat = new THREE.MeshStandardMaterial({ color: 0x4caf50 });
+    const roof = new THREE.Mesh(roofGeo, roofMat);
+    roof.position.y = 4.75;
+    roof.rotation.y = Math.PI / 4;
+    group.add(roof);
+    
+    // 큰 재활용 마크
+    const markGeo = new THREE.CircleGeometry(0.8, 32);
+    const markMat = new THREE.MeshStandardMaterial({
+        color: 0x4caf50,
+        emissive: 0x2e7d32,
+        emissiveIntensity: 0.5,
+    });
+    const mark = new THREE.Mesh(markGeo, markMat);
+    mark.position.set(0, 2.5, 2.51);
+    group.add(mark);
+    
+    group.position.set(x, 0, z);
+    state.scene.add(group);
+}
+
+// 환경 보호 광고판
+function createEcoBillboard(x, z) {
+    const group = new THREE.Group();
+    
+    // 지주 2개
+    const poleGeo = new THREE.CylinderGeometry(0.15, 0.15, 5, 8);
+    const poleMat = new THREE.MeshStandardMaterial({ color: 0x424242 });
+    
+    const pole1 = new THREE.Mesh(poleGeo, poleMat);
+    pole1.position.set(-1.5, 2.5, 0);
+    group.add(pole1);
+    
+    const pole2 = new THREE.Mesh(poleGeo, poleMat);
+    pole2.position.set(1.5, 2.5, 0);
+    group.add(pole2);
+    
+    // 광고판
+    const boardGeo = new THREE.BoxGeometry(3.5, 2, 0.1);
+    const boardMat = new THREE.MeshStandardMaterial({
+        color: 0x81c784,
+        emissive: 0x66bb6a,
+        emissiveIntensity: 0.3,
+    });
+    const board = new THREE.Mesh(boardGeo, boardMat);
+    board.position.y = 4;
+    group.add(board);
+    
+    // "ECO" 텍스트 표현 (간단한 박스들로)
+    const textMat = new THREE.MeshStandardMaterial({
+        color: 0xffffff,
+        emissive: 0xffffff,
+        emissiveIntensity: 0.5,
+    });
+    
+    // E
+    const e1 = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.5, 0.05), textMat);
+    e1.position.set(-0.8, 4, 0.1);
+    group.add(e1);
+    
+    // C
+    const c = new THREE.Mesh(new THREE.TorusGeometry(0.2, 0.05, 8, 16, Math.PI * 1.5), textMat);
+    c.position.set(0, 4, 0.1);
+    c.rotation.y = Math.PI;
+    group.add(c);
+    
+    // O
+    const o = new THREE.Mesh(new THREE.TorusGeometry(0.2, 0.05, 8, 16), textMat);
+    o.position.set(0.8, 4, 0.1);
+    group.add(o);
+    
+    group.position.set(x, 0, z);
+    state.scene.add(group);
+}
+
+// 풍력 발전기
+function createWindTurbine(x, z) {
+    const group = new THREE.Group();
+    
+    // 타워
+    const towerGeo = new THREE.CylinderGeometry(0.3, 0.5, 15, 8);
+    const towerMat = new THREE.MeshStandardMaterial({ color: 0xeeeeee });
+    const tower = new THREE.Mesh(towerGeo, towerMat);
+    tower.position.y = 7.5;
+    group.add(tower);
+    
+    // 나셀 (본체)
+    const nacelleGeo = new THREE.CylinderGeometry(0.5, 0.5, 2, 8);
+    const nacelleMat = new THREE.MeshStandardMaterial({ color: 0xffffff });
+    const nacelle = new THREE.Mesh(nacelleGeo, nacelleMat);
+    nacelle.rotation.z = Math.PI / 2;
+    nacelle.position.set(0, 15, 0.5);
+    group.add(nacelle);
+    
+    // 블레이드 3개
+    const bladeMat = new THREE.MeshStandardMaterial({
+        color: 0xfafafa,
+        side: THREE.DoubleSide,
+    });
+    
+    for (let i = 0; i < 3; i++) {
+        const bladeGeo = new THREE.BoxGeometry(0.1, 4, 0.5);
+        const blade = new THREE.Mesh(bladeGeo, bladeMat);
+        blade.position.y = 2;
+        
+        const bladeArm = new THREE.Group();
+        bladeArm.add(blade);
+        bladeArm.rotation.z = (i * Math.PI * 2) / 3;
+        bladeArm.position.set(0, 15, 1.5);
+        group.add(bladeArm);
+    }
+    
+    group.position.set(x, 0, z);
+    state.scene.add(group);
+}
+
+// 화단
+function createFlowerBed(x, z) {
+    const group = new THREE.Group();
+    
+    // 화단 틀
+    const bedGeo = new THREE.BoxGeometry(1.5, 0.3, 0.8);
+    const bedMat = new THREE.MeshStandardMaterial({ color: 0x795548 });
+    const bed = new THREE.Mesh(bedGeo, bedMat);
+    bed.position.y = 0.15;
+    group.add(bed);
+    
+    // 흙
+    const soilGeo = new THREE.BoxGeometry(1.4, 0.1, 0.7);
+    const soilMat = new THREE.MeshStandardMaterial({ color: 0x5d4037 });
+    const soil = new THREE.Mesh(soilGeo, soilMat);
+    soil.position.y = 0.35;
+    group.add(soil);
+    
+    // 꽃들
+    const flowerColors = [0xff1744, 0xff9100, 0xffea00, 0xe91e63, 0x9c27b0];
+    for (let i = 0; i < 5; i++) {
+        const stemGeo = new THREE.CylinderGeometry(0.02, 0.02, 0.3, 4);
+        const stemMat = new THREE.MeshStandardMaterial({ color: 0x33691e });
+        const stem = new THREE.Mesh(stemGeo, stemMat);
+        stem.position.set((i - 2) * 0.25, 0.55, (Math.random() - 0.5) * 0.3);
+        group.add(stem);
+        
+        const flowerGeo = new THREE.SphereGeometry(0.08, 6, 6);
+        const flowerMat = new THREE.MeshStandardMaterial({
+            color: flowerColors[i % flowerColors.length],
+            emissive: flowerColors[i % flowerColors.length],
+            emissiveIntensity: 0.3,
+        });
+        const flower = new THREE.Mesh(flowerGeo, flowerMat);
+        flower.position.set((i - 2) * 0.25, 0.75, (Math.random() - 0.5) * 0.3);
+        group.add(flower);
+    }
+    
+    group.position.set(x, 0, z);
+    state.scene.add(group);
+    state.environmentObjects.push(group);
+}
+
+// 도로 표지판 생성
+function createRoadSign(x, z) {
+    const group = new THREE.Group();
+    
+    // 기둥
+    const poleGeo = new THREE.CylinderGeometry(0.1, 0.1, 3, 8);
+    const poleMat = new THREE.MeshStandardMaterial({ color: 0x808080 });
+    const pole = new THREE.Mesh(poleGeo, poleMat);
+    pole.position.y = 1.5;
+    pole.castShadow = true;
+    group.add(pole);
+    
+    // 표지판
+    const signGeo = new THREE.BoxGeometry(1, 1, 0.1);
+    const signMat = new THREE.MeshStandardMaterial({
+        color: 0x32cd32, // 환경 테마에 맞게 초록색
+    });
+    const sign = new THREE.Mesh(signGeo, signMat);
+    sign.position.y = 3.5;
+    sign.castShadow = true;
+    group.add(sign);
+    
+    group.position.set(x, 0, z);
+    state.scene.add(group);
+    state.environmentObjects.push(group);
+}
+
+// 3D 쓰레기통 생성 (뚜껑 + 몸통 + 디테일 + 텍스트)
+function createTrashBin(color, labelText = '') {
+    const bin = new THREE.Group();
+    
+    // 몸통용 캔버스 텍스처 생성 (텍스트 포함)
+    const canvas = document.createElement('canvas');
+    canvas.width = 2048;
+    canvas.height = 2048;
+    const ctx = canvas.getContext('2d');
+    
+    // 배경색 (쓰레기통 색상)
+    ctx.fillStyle = '#' + color.toString(16).padStart(6, '0');
+    ctx.fillRect(0, 0, 2048, 2048);
+    
+    // 텍스트 그리기
+    if (labelText) {
+        // 검은색 배경 박스 (상단으로 이동)
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.95)';
+        ctx.fillRect(200, 400, 1648, 648);
+        
+        // 텍스트 선명도를 위한 설정
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        
+        // 텍스트 외곽선 추가로 선명도 향상
+        ctx.font = 'bold 280px Noto Sans KR, Arial, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        
+        // 외곽선 (더 선명하게)
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = 8;
+        ctx.strokeText(labelText, 1024, 724);
+        
+        // 텍스트 본체
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillText(labelText, 1024, 724);
+    }
+    
+    const bodyTexture = new THREE.CanvasTexture(canvas);
+    bodyTexture.anisotropy = 16; // 텍스처 선명도 향상
+    bodyTexture.needsUpdate = true;
+    
+    // 몸통 (아래가 약간 좁은 원기둥) - 크기 증가
+    const bodyGeo = new THREE.CylinderGeometry(1.2, 1.05, 2.5, 32);
+    const bodyMat = new THREE.MeshStandardMaterial({
+        map: bodyTexture,
+        roughness: 0.6,
+        metalness: 0.1,
+    });
+    const body = new THREE.Mesh(bodyGeo, bodyMat);
+    body.position.y = 0;
+    body.castShadow = true;
+    body.receiveShadow = true;
+    bin.add(body);
+    
+    // 뚜껑 (윗부분) - 크기 증가
+    const lidGeo = new THREE.CylinderGeometry(1.35, 1.25, 0.4, 16);
+    const lidMat = new THREE.MeshStandardMaterial({
+        color: color,
+        roughness: 0.5,
+        metalness: 0.2,
+    });
+    const lid = new THREE.Mesh(lidGeo, lidMat);
+    lid.position.y = 1.45;
+    lid.castShadow = true;
+    bin.add(lid);
+    
+    // 뚜껑 손잡이 - 크기 증가
+    const handleGeo = new THREE.CylinderGeometry(0.2, 0.2, 0.2, 8);
+    const handleMat = new THREE.MeshStandardMaterial({
+        color: new THREE.Color(color).multiplyScalar(0.7), // 약간 어두운 색
+        roughness: 0.8,
+    });
+    const handle = new THREE.Mesh(handleGeo, handleMat);
+    handle.position.y = 1.8;
+    handle.castShadow = true;
+    bin.add(handle);
+    
+    // 쓰레기통 입구 표시 (어두운 원형 테두리) - 크기 증가
+    const openingGeo = new THREE.CylinderGeometry(1.0, 1.0, 0.07, 16);
+    const openingMat = new THREE.MeshStandardMaterial({
+        color: 0x000000,
+        roughness: 0.9,
+    });
+    const opening = new THREE.Mesh(openingGeo, openingMat);
+    opening.position.y = 1.28;
+    bin.add(opening);
+    
+    // 쓰레기통 바닥 테두리 - 크기 증가
+    const rimGeo = new THREE.TorusGeometry(1.06, 0.07, 8, 16);
+    const rimMat = new THREE.MeshStandardMaterial({
+        color: new THREE.Color(color).multiplyScalar(0.6),
+        roughness: 0.7,
+    });
+    const rim = new THREE.Mesh(rimGeo, rimMat);
+    rim.rotation.x = Math.PI / 2;
+    rim.position.y = -1.25;
+    bin.add(rim);
+    
+    return bin;
+}
+
+// 플레이어 (단순 박스)
+function createPlayer() {
+    const player = new THREE.Group();
+    
+    // 머리 (구형)
+    const headGeo = new THREE.SphereGeometry(0.35, 16, 16);
+    const skinMat = new THREE.MeshStandardMaterial({ color: 0xffdbac }); // 살구색
+    const head = new THREE.Mesh(headGeo, skinMat);
+    head.position.set(0, 1.45, 0);
+    head.castShadow = true;
+    player.add(head);
+    
+    // 머리카락 (뒤통수 보이도록)
+    const hairGeo = new THREE.SphereGeometry(0.36, 16, 16, 0, Math.PI * 2, 0, Math.PI * 0.7);
+    const hairMat = new THREE.MeshStandardMaterial({ color: 0x2c1810 }); // 갈색 머리
+    const hair = new THREE.Mesh(hairGeo, hairMat);
+    hair.position.set(0, 1.55, 0);
+    hair.castShadow = true;
+    player.add(hair);
+    
+    // 목
+    const neckGeo = new THREE.CylinderGeometry(0.12, 0.12, 0.15, 8);
+    const neck = new THREE.Mesh(neckGeo, skinMat);
+    neck.position.set(0, 1.15, 0);
+    player.add(neck);
+    
+    // 몸통 (티셔츠)
+    const bodyGeo = new THREE.BoxGeometry(0.7, 0.9, 0.4);
+    const bodyMat = new THREE.MeshStandardMaterial({ color: 0x2196f3 }); // 파란색 티셔츠
+    const body = new THREE.Mesh(bodyGeo, bodyMat);
+    body.position.set(0, 0.6, 0);
+    body.castShadow = true;
+    player.add(body);
+    player.userData.body = body;
+    
+    // 왼팔 그룹
+    const leftArmGroup = new THREE.Group();
+    leftArmGroup.position.set(-0.45, 0.95, 0);
+    player.add(leftArmGroup);
+    
+    const armGeo = new THREE.CylinderGeometry(0.09, 0.08, 0.6, 8);
+    const leftArm = new THREE.Mesh(armGeo, bodyMat);
+    leftArm.position.y = -0.3;
+    leftArm.castShadow = true;
+    leftArmGroup.add(leftArm);
+    
+    const handGeo = new THREE.SphereGeometry(0.1, 8, 8);
+    const leftHand = new THREE.Mesh(handGeo, skinMat);
+    leftHand.position.y = -0.65;
+    leftArmGroup.add(leftHand);
+    player.userData.leftArmGroup = leftArmGroup;
+    
+    // 오른팔 그룹
+    const rightArmGroup = new THREE.Group();
+    rightArmGroup.position.set(0.45, 0.95, 0);
+    player.add(rightArmGroup);
+    
+    const rightArm = new THREE.Mesh(armGeo, bodyMat);
+    rightArm.position.y = -0.3;
+    rightArm.castShadow = true;
+    rightArmGroup.add(rightArm);
+    
+    const rightHand = new THREE.Mesh(handGeo, skinMat);
+    rightHand.position.y = -0.65;
+    rightArmGroup.add(rightHand);
+    player.userData.rightArmGroup = rightArmGroup;
+    
+    // 왼쪽 다리 그룹
+    const leftLegGroup = new THREE.Group();
+    leftLegGroup.position.set(-0.18, 0.15, 0);
+    player.add(leftLegGroup);
+    
+    const thighGeo = new THREE.CylinderGeometry(0.12, 0.11, 0.5, 8);
+    const legMat = new THREE.MeshStandardMaterial({ color: 0x1565c0 });
+    const leftThigh = new THREE.Mesh(thighGeo, legMat);
+    leftThigh.position.y = -0.25;
+    leftThigh.castShadow = true;
+    leftLegGroup.add(leftThigh);
+    
+    const leftKneeGroup = new THREE.Group();
+    leftKneeGroup.position.y = -0.5;
+    leftLegGroup.add(leftKneeGroup);
+    
+    const calfGeo = new THREE.CylinderGeometry(0.11, 0.09, 0.5, 8);
+    const leftCalf = new THREE.Mesh(calfGeo, legMat);
+    leftCalf.position.y = -0.25;
+    leftCalf.castShadow = true;
+    leftKneeGroup.add(leftCalf);
+    
+    const shoeGeo = new THREE.BoxGeometry(0.16, 0.12, 0.28);
+    const shoeMat = new THREE.MeshStandardMaterial({ color: 0x212121 });
+    const leftShoe = new THREE.Mesh(shoeGeo, shoeMat);
+    leftShoe.position.set(0, -0.55, 0.06);
+    leftShoe.castShadow = true;
+    leftKneeGroup.add(leftShoe);
+    
+    player.userData.leftLegGroup = leftLegGroup;
+    player.userData.leftKneeGroup = leftKneeGroup;
+    
+    // 오른쪽 다리 그룹
+    const rightLegGroup = new THREE.Group();
+    rightLegGroup.position.set(0.18, 0.15, 0);
+    player.add(rightLegGroup);
+    
+    const rightThigh = new THREE.Mesh(thighGeo, legMat);
+    rightThigh.position.y = -0.25;
+    rightThigh.castShadow = true;
+    rightLegGroup.add(rightThigh);
+    
+    const rightKneeGroup = new THREE.Group();
+    rightKneeGroup.position.y = -0.5;
+    rightLegGroup.add(rightKneeGroup);
+    
+    const rightCalf = new THREE.Mesh(calfGeo, legMat);
+    rightCalf.position.y = -0.25;
+    rightCalf.castShadow = true;
+    rightKneeGroup.add(rightCalf);
+    
+    const rightShoe = new THREE.Mesh(shoeGeo, shoeMat);
+    rightShoe.position.set(0, -0.55, 0.06);
+    rightShoe.castShadow = true;
+    rightKneeGroup.add(rightShoe);
+    
+    player.userData.rightLegGroup = rightLegGroup;
+    player.userData.rightKneeGroup = rightKneeGroup;
+    
+    // 가방 (등에)
+    const bagGeo = new THREE.BoxGeometry(0.5, 0.6, 0.2);
+    const bagMat = new THREE.MeshStandardMaterial({ color: 0x4caf50 });
+    const bag = new THREE.Mesh(bagGeo, bagMat);
+    bag.position.set(0, 0.6, -0.35);
+    bag.castShadow = true;
+    player.add(bag);
+    
+    // 애니메이션 시간
+    player.userData.animationTime = 0;
+    
+    player.position.set(state.lanes[state.playerLane], 1, 5);
+    state.scene.add(player);
+    state.player = player;
+}
+
+// 2D 캔버스 텍스트 스프라이트 생성 헬퍼
+function createTextSprite(text, width = 512, height = 128, fontSize = 36) {
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+
+    ctx.clearRect(0, 0, width, height);
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+    ctx.fillRect(0, 0, width, height);
+    ctx.font = `bold ${fontSize}px Noto Sans KR`;
+    ctx.fillStyle = 'white';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(text, width / 2, height / 2);
+
+    const texture = new THREE.CanvasTexture(canvas);
+    const mat = new THREE.SpriteMaterial({
+        map: texture,
+        transparent: true,
+    });
+    const sprite = new THREE.Sprite(mat);
+    return sprite;
+}
+
+// 지역 데이터 로드
+async function loadRegionData() {
+    const select = document.getElementById('regionSelect');
+    const file = select.value;
+
+    try {
+        const res = await fetch(file);
+        state.regionData = await res.json();
+    } catch (e) {
+        console.error('Failed to load region data', e);
+        // 기본 값
+        state.regionData = {
+            bins: [
+                {
+                    id: 'general',
+                    name: '일반쓰레기',
+                    name_en: 'General Waste',
+                    color: 0x757575,
+                },
+                {
+                    id: 'recycle',
+                    name: '재활용',
+                    name_en: 'Recyclables',
+                    color: 0x2196f3,
+                },
+                {
+                    id: 'food',
+                    name: '음식물',
+                    name_en: 'Food Waste',
+                    color: 0xffb74d,
+                },
+            ],
+            problems: [
+                {
+                    question: '어떤 쓰레기를 버려야 할까요? (플라스틱 병)',
+                    question_en:
+                        'Which bin should this go into? (Plastic bottle)',
+                    answer: 'recycle',
+                    explanation: '플라스틱 병은 재활용으로 분류됩니다.',
+                    explanation_en: 'Plastic bottles go into the recycling bin.',
+                },
+            ],
+        };
+    }
+}
+
+// JSON의 모든 문제를 기반으로 여러 세트(쓰레기통 3개 + 위 타입 라벨 + 문제 스프라이트)를
+// z 축 방향으로 간격을 두고 한 번에 생성
+function createAllProblemSets() {
+    // 이전 세트들 제거
+    if (state.problemSets && state.problemSets.length > 0) {
+        state.problemSets.forEach((set) => {
+            if (set.questionSprite) state.scene.remove(set.questionSprite);
+            if (Array.isArray(set.bins)) {
+                set.bins.forEach((b) => {
+                    if (b.mesh) state.scene.remove(b.mesh);
+                    if (b.label) state.scene.remove(b.label);
+                });
+            }
+        });
+    }
+    state.problemSets = [];
+
+    if (!state.regionData || !state.regionData.bins || state.regionData.bins.length < 3)
+        return;
+    const binsData = state.regionData.bins;
+    const allProblems = Array.isArray(state.regionData.problems)
+        ? state.regionData.problems
+        : [];
+
+    if (allProblems.length === 0) return;
+
+    const shuffledProblems = allProblems.slice();
+    for (let i = shuffledProblems.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        const temp = shuffledProblems[i];
+        shuffledProblems[i] = shuffledProblems[j];
+        shuffledProblems[j] = temp;
+    }
+
+    const maxProblems = 10;
+    const problems = shuffledProblems.slice(0, Math.min(maxProblems, shuffledProblems.length));
+
+    // 첫 번째 세트 시작 z, 세트 간 간격
+    const firstStartZ = 60;
+    const gapZ = 40; // 세트 사이 간격
+
+    let lastBaseZ = firstStartZ;
+
+    problems.forEach((problem, index) => {
+        const baseZ = firstStartZ + index * gapZ;
+        lastBaseZ = baseZ;
+
+        const setBins = [];
+        for (let i = 0; i < 3; i++) {
+            const binData = binsData[i];
+            // 게임 분위기에 맞는 밝고 선명한 색상 팔레트에서 랜덤 선택
+            const colorPalette = [
+                0xff6b6b, // 밝은 빨강
+                0x4ecdc4, // 청록색
+                0xffe66d, // 노란색
+                0x95e1d3, // 민트색
+                0xf38181, // 연한 빨강
+                0xaa96da, // 라벤더
+                0xfcbad3, // 핑크
+                0xa8e6cf, // 연한 초록
+                0xff8b94, // 코랄
+                0x6c5ce7, // 보라색
+                0x74b9ff, // 하늘색
+                0xfdcb6e, // 주황색
+                0x55efc4, // 밝은 민트
+                0xfd79a8, // 핫핑크
+                0x81ecec  // 아쿠아
+            ];
+            const randomColor = colorPalette[Math.floor(Math.random() * colorPalette.length)];
+            
+            // 라벨 텍스트 준비
+            const binLabelText =
+                state.language === 'en' && binData.name_en
+                    ? binData.name_en
+                    : binData.name;
+            
+            const bin = createTrashBin(randomColor, binLabelText);
+            bin.castShadow = true;
+            bin.position.set(state.lanes[i], 1, baseZ);
+
+            // 쓰레기통 크기 설정
+            bin.scale.set(1.1, 1.1, 1.1);
+
+            // 타입별 간단한 아이콘을 통 앞쪽에 추가
+            const iconGroup = new THREE.Group();
+            iconGroup.position.set(0, -0.6, 1.25);
+
+            if (binData.id === 'recycle') {
+                // 재활용: PET 병 느낌의 실린더 + 뚜껑
+                const bottleBodyGeo = new THREE.CylinderGeometry(0.12, 0.11, 0.5, 8);
+                const bottleBodyMat = new THREE.MeshStandardMaterial({
+                    color: 0x90caf9,
+                    metalness: 0.1,
+                    roughness: 0.4,
+                });
+                const bottleBody = new THREE.Mesh(bottleBodyGeo, bottleBodyMat);
+                bottleBody.position.set(0, 0.25, 0);
+                iconGroup.add(bottleBody);
+
+                const bottleCapGeo = new THREE.CylinderGeometry(0.08, 0.08, 0.06, 8);
+                const bottleCapMat = new THREE.MeshStandardMaterial({ color: 0x1565c0 });
+                const bottleCap = new THREE.Mesh(bottleCapGeo, bottleCapMat);
+                bottleCap.position.set(0, 0.55, 0);
+                iconGroup.add(bottleCap);
+            } else if (binData.id === 'food') {
+                // 음식물: 반쯤 먹은 음식 느낌의 원뿔 + 작은 접시
+                const plateGeo = new THREE.CylinderGeometry(0.18, 0.18, 0.04, 12);
+                const plateMat = new THREE.MeshStandardMaterial({ color: 0xffffff });
+                const plate = new THREE.Mesh(plateGeo, plateMat);
+                plate.position.set(0, 0.02, 0);
+                iconGroup.add(plate);
+
+                const foodGeo = new THREE.ConeGeometry(0.16, 0.25, 12);
+                const foodMat = new THREE.MeshStandardMaterial({ color: 0xffb74d });
+                const food = new THREE.Mesh(foodGeo, foodMat);
+                food.position.set(0, 0.2, 0);
+                iconGroup.add(food);
+            } else if (binData.id === 'general') {
+                // 일반: 검은 봉투 모양 아이콘
+                const bagGeo = new THREE.SphereGeometry(0.18, 12, 12);
+                const bagMat = new THREE.MeshStandardMaterial({ color: 0x424242 });
+                const bag = new THREE.Mesh(bagGeo, bagMat);
+                bag.scale.y = 1.2;
+                bag.position.set(0, 0.22, 0);
+                iconGroup.add(bag);
+
+                const tieGeo = new THREE.CylinderGeometry(0.03, 0.03, 0.12, 6);
+                const tieMat = new THREE.MeshStandardMaterial({ color: 0x212121 });
+                const tie = new THREE.Mesh(tieGeo, tieMat);
+                tie.position.set(0, 0.5, 0);
+                iconGroup.add(tie);
+            }
+
+            bin.add(iconGroup);
+            state.scene.add(bin);
+
+            setBins.push({
+                mesh: bin,
+                id: binData.id,
+                // name은 항상 기본(한글) 이름을 보존
+                name: binData.name,
+                lane: i,
+            });
+        }
+
+        state.problemSets.push({
+            problem,
+            questionSprite: null,
+            bins: setBins,
+            resolved: false, // 판정 완료 여부
+        });
+    });
+
+    // 트랙 끝 z 값 저장 (마지막 문제 세트의 위치 기준)
+    state.trackEndZ = lastBaseZ;
+
+    // 첫 번째 미해결 세트를 기준으로 상단 문제 패널 텍스트를 갱신
+    updateQuestionPanelForNextSet();
+}
+
+// 상단 문제 패널에 다음 문제 텍스트를 반영
+function updateQuestionPanelForNextSet() {
+    const panel = document.getElementById('questionPanel');
+    const textEl = document.getElementById('questionText');
+    if (!panel || !textEl) return;
+
+    const nextSet = state.problemSets.find((s) => !s.resolved);
+    if (!nextSet) {
+        panel.style.display = 'none';
+        textEl.textContent = '';
+        return;
+    }
+
+    const problem = nextSet.problem;
+    const questionText =
+        state.language === 'en' && problem.question_en
+            ? problem.question_en
+            : problem.question;
+
+    textEl.textContent = questionText || '';
+    panel.style.display = 'block';
+}
+
+// HUD 업데이트
+function updateHud() {
+    document.getElementById('score').textContent = state.score;
+    const timeLeft = Math.max(0, Math.ceil(state.gameTimeLimit - state.gameTime));
+    document.getElementById('timeLeft').textContent = timeLeft;
+    updateTierHud();
+}
+
+// 피드백 표시
+function showFeedback(message, isCorrect) {
+    const el = document.getElementById('feedbackMessage');
+    el.textContent = message;
+    el.className = isCorrect ? 'correct' : 'incorrect';
+    el.style.display = 'block';
+    setTimeout(() => {
+        el.style.display = 'none';
+    }, 1200);
+}
+
+// 랭킹 저장
+function saveRanking(playerName, score) {
+    let rankings = JSON.parse(localStorage.getItem('ecoRunnerRankings')) || [];
+    rankings.push({
+        name: playerName,
+        score,
+        date:
+            state.language === 'en'
+                ? new Date().toLocaleDateString('en-US')
+                : new Date().toLocaleDateString('ko-KR'),
+    });
+    rankings.sort((a, b) => b.score - a.score);
+    rankings = rankings.slice(0, 10);
+    localStorage.setItem('ecoRunnerRankings', JSON.stringify(rankings));
+}
+
+// 랭킹 표시
+function displayRanking() {
+    const rankings = JSON.parse(localStorage.getItem('ecoRunnerRankings')) || [];
+    const listEl = document.getElementById('rankingList');
+    if (rankings.length === 0) {
+        listEl.innerHTML = `<p>${t('noRecords')}</p>`;
+        return;
+    }
+
+    let html = '<table style="width: 100%; text-align: left; border-collapse: collapse;">';
+    html += `<thead><tr><th>${t('rankingHeaderRank')}</th><th>${t(
+        'rankingHeaderName'
+    )}</th><th>${t('rankingHeaderScore')}</th><th>${t(
+        'rankingHeaderDate'
+    )}</th></tr></thead><tbody>`;
+    rankings.forEach((r, idx) => {
+        const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `${idx + 1}.`;
+        html += `<tr>
+            <td style="padding: 8px;">${medal}</td>
+            <td style="padding: 8px;">${r.name}</td>
+            <td style="padding: 8px;">${r.score}${t('rankingScoreSuffix')}</td>
+            <td style="padding: 8px;">${r.date}</td>
+        </tr>`;
+    });
+    html += '</tbody></table>';
+    listEl.innerHTML = html;
+}
+
+function getTierInfo(score) {
+    const tiers = [
+        { id: 'bronze', name: '브론즈', min: 0 },
+        { id: 'silver', name: '실버', min: 100 },
+        { id: 'gold', name: '골드', min: 200 },
+        { id: 'platinum', name: '플래티넘', min: 300 },
+        { id: 'diamond', name: '다이아', min: 400 },
+    ];
+
+    const current = tiers
+        .slice()
+        .reverse()
+        .find((t) => score >= t.min) || tiers[0];
+
+    const nextIndex = tiers.findIndex((t) => t.id === current.id) + 1;
+    const next = nextIndex < tiers.length ? tiers[nextIndex] : null;
+
+    const tierBase = current.min;
+    const withinTier = Math.max(0, Math.min(100, score - tierBase));
+    const progressPercent = Math.max(0, Math.min(100, withinTier));
+
+    return {
+        current,
+        next,
+        withinTier,
+        progressPercent,
+    };
+}
+
+function getEndingMessage(score) {
+    const clamped = Math.max(0, Math.min(100, score));
+    let title = '';
+    let body = '';
+
+    if (clamped <= 20) {
+        title = '초심자';
+        body = '아쉽네요... 더 노력하시면 좋겠어요. 다음번에는 꼭 더 많은 문제를 맞춰봐요!';
+    } else if (clamped <= 40) {
+        title = '도전 중';
+        body = '좋은 시작이에요! 기초를 더 다지면 성과가 확실히 올라갈 거예요. 계속 도전해 보세요.';
+    } else if (clamped <= 60) {
+        title = '중간 수준';
+        body = '잘하셨어요! 반 이상은 맞췄습니다. 조금만 더 연습하면 더 높은 점수를 받을 수 있어요.';
+    } else if (clamped <= 80) {
+        title = '우수';
+        body = '아주 훌륭해요! 실력이 탄탄하네요. 몇 가지만 더 보완하면 만점도 무난할 거예요.';
+    } else {
+        title = '만점/최고';
+        body = '대단해요! 거의(또는 완전히) 정답을 맞추셨습니다. 축하드려요 — 훌륭한 성과예요!';
+    }
+
+    return {
+        clamped,
+        title,
+        body,
+    };
+}
+
+function updateEndingTierAndMessage() {
+    const tierSummary = document.getElementById('tierSummary');
+    const badge = document.getElementById('tierBadgeEnding');
+    const tierNameText = document.getElementById('tierNameText');
+    const bar = document.getElementById('tierProgressBar');
+    const progressText = document.getElementById('tierProgressText');
+    const msgEl = document.getElementById('endingMessageText');
+
+    if (!tierSummary || !badge || !tierNameText || !bar || !progressText || !msgEl) return;
+
+    const score = state.score;
+    const tier = getTierInfo(score);
+    const msg = getEndingMessage(score);
+
+    badge.textContent = tier.current.name.charAt(0);
+
+    let badgeColor = '#795548';
+    if (tier.current.id === 'silver') badgeColor = '#b0bec5';
+    else if (tier.current.id === 'gold') badgeColor = '#ffd54f';
+    else if (tier.current.id === 'platinum') badgeColor = '#b3e5fc';
+    else if (tier.current.id === 'diamond') badgeColor = '#b39ddb';
+    badge.style.background = badgeColor;
+
+    const nextName = tier.next ? tier.next.name : '최고 티어';
+    const remain = tier.next ? Math.max(0, tier.next.min - score) : 0;
+
+    tierNameText.textContent = `${tier.current.name} 티어`;
+    bar.style.width = `${tier.progressPercent}%`;
+    progressText.textContent = tier.next
+        ? `다음 티어(${nextName})까지 ${remain}점 남았습니다.`
+        : `최고 티어에 도달했습니다!`;
+
+    msgEl.textContent = `당신의 점수: ${msg.clamped}점 — ${msg.title} : ${msg.body}`;
+}
+
+// 게임 종료
+function endGame() {
+    state.isPlaying = false;
+    if (state.animationId) cancelAnimationFrame(state.animationId);
+
+    document.getElementById('finalScore').textContent = state.score;
+
+    // 게임 종료 시 상단 문제 패널 숨기기
+    const panel = document.getElementById('questionPanel');
+    if (panel) panel.style.display = 'none';
+
+    // 티어 및 종료 메시지 반영
+    updateEndingTierAndMessage();
+
+    document.getElementById('ending').style.display = 'flex';
+}
+
+// 오답노트 화면 표시
+function showReviewScreen() {
+    const review = document.getElementById('review');
+    const reviewList = document.getElementById('reviewList');
+
+    if (!review || !reviewList) return;
+
+    reviewList.innerHTML = '';
+
+    if (!state.incorrectAnswers || state.incorrectAnswers.length === 0) {
+        // 모두 정답인 경우 안내 문구만 표시
+        const p = document.createElement('p');
+        p.textContent = t('allCorrect');
+        reviewList.appendChild(p);
+    } else {
+        state.incorrectAnswers.forEach((item, index) => {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'review-item';
+
+            // 문제 문장 한 줄
+            const q = document.createElement('p');
+            q.textContent = `${t('questionPrefix')} ${index + 1}. ${item.question}`;
+            wrapper.appendChild(q);
+
+            // 내가 선택한 답과 정답 여부 표시 (오답노트에는 모두 틀린 문제만 담기므로 항상 오답)
+            const yourLine = document.createElement('p');
+            yourLine.textContent = `${t('selectedAnswerLabel')} ${item.yourAnswer} (오답)`;
+            wrapper.appendChild(yourLine);
+
+            // 정답은 별도 줄로 표시
+            const correctLine = document.createElement('p');
+            correctLine.textContent = `${t('correctAnswerLabel')} ${item.correctAnswer}`;
+            wrapper.appendChild(correctLine);
+
+            // 설명은 선택적으로 짧게 한 줄만
+            if (item.explanation) {
+                const exp = document.createElement('p');
+                exp.textContent = `${t('explanationLabel')} ${item.explanation}`;
+                wrapper.appendChild(exp);
+            }
+
+            reviewList.appendChild(wrapper);
+        });
+    }
+
+    review.style.display = 'flex';
+}
+
+// 키보드 입력
+function setupKeyboardControls() {
+    const exitModal = document.getElementById('exitModal');
+    const exitConfirmBtn = document.getElementById('exitConfirmBtn');
+    const exitCancelBtn = document.getElementById('exitCancelBtn');
+
+    document.addEventListener('keydown', (e) => {
+        // ESC로 종료 확인 모달 표시
+        if (e.key === 'Escape') {
+            // 실제 게임 플레이 중이 아닐 때는(인트로나 엔딩 등) 무시
+            if (!state.isPlaying) return;
+            if (!exitModal) return;
+            e.preventDefault();
+            // 이미 모달이 열려 있으면 닫기
+            const isHidden = exitModal.classList.contains('hidden');
+            if (isHidden) {
+                state.isPlaying = false;
+                exitModal.classList.remove('hidden');
+            } else {
+                exitModal.classList.add('hidden');
+                state.isPlaying = true;
+            }
+            return;
+        }
+
+        if (!state.isPlaying) return;
+
+        if (e.key === 'ArrowLeft' || e.key.toLowerCase() === 'a') {
+            state.playerLane = Math.min(2, state.playerLane + 1);
+        } else if (e.key === 'ArrowRight' || e.key.toLowerCase() === 'd') {
+            state.playerLane = Math.max(0, state.playerLane - 1);
+        }
+    });
+
+    if (exitConfirmBtn) {
+        exitConfirmBtn.addEventListener('click', () => {
+            location.reload();
+        });
+    }
+
+    if (exitCancelBtn) {
+        exitCancelBtn.addEventListener('click', () => {
+            if (!exitModal) return;
+            exitModal.classList.add('hidden');
+            state.isPlaying = true;
+            gameLoop();
+        });
+    }
+}
+
+// 달리기 애니메이션
+function animateRunning(player) {
+    if (!player.userData) return;
+    
+    // 달리기 주기를 조금 더 빠르게 해서 역동적인 느낌 강화
+    player.userData.animationTime += 0.25;
+    const t = player.userData.animationTime;
+    
+    // 팔 흔들기
+    if (player.userData.leftArmGroup) {
+        player.userData.leftArmGroup.rotation.x = Math.sin(t) * 0.8;
+        player.userData.leftArmGroup.rotation.z = Math.sin(t) * 0.1;
+    }
+    if (player.userData.rightArmGroup) {
+        player.userData.rightArmGroup.rotation.x = Math.sin(t + Math.PI) * 0.8;
+        player.userData.rightArmGroup.rotation.z = Math.sin(t + Math.PI) * 0.1;
+    }
+    
+    // 왼쪽 다리 - 허벅지와 무릎
+    if (player.userData.leftLegGroup) {
+        const leftThighAngle = Math.sin(t + Math.PI) * 0.6;
+        player.userData.leftLegGroup.rotation.x = leftThighAngle;
+        
+        if (player.userData.leftKneeGroup) {
+            const leftKneeAngle = Math.max(0, -Math.sin(t + Math.PI) * 1.0);
+            player.userData.leftKneeGroup.rotation.x = leftKneeAngle;
+        }
+    }
+    
+    // 오른쪽 다리 - 허벅지와 무릎
+    if (player.userData.rightLegGroup) {
+        const rightThighAngle = Math.sin(t) * 0.6;
+        player.userData.rightLegGroup.rotation.x = rightThighAngle;
+        
+        if (player.userData.rightKneeGroup) {
+            const rightKneeAngle = Math.max(0, -Math.sin(t) * 1.0);
+            player.userData.rightKneeGroup.rotation.x = rightKneeAngle;
+        }
+    }
+    
+    // 몸통 상하 움직임
+    if (player.userData.body) {
+        // 상하 움직임 폭을 조금 키워서 뛰는 느낌을 강조
+        player.userData.body.position.y = 0.6 + Math.abs(Math.sin(t * 2)) * 0.07;
+    }
+    
+    // 몸 전체 약간 앞으로 기울이기
+    player.rotation.x = -0.05;
+}
+
+// 메인 게임 루프
+function gameLoop() {
+    if (!state.isPlaying) return;
+    state.animationId = requestAnimationFrame(gameLoop);
+
+    // 시간
+    state.gameTime += 1 / 60;
+    updateHud();
+    if (state.gameTime >= state.gameTimeLimit) {
+        endGame();
+        return;
+    }
+
+    // 플레이어 레인 이동(보간)
+    const targetX = state.lanes[state.playerLane];
+    state.player.position.x += (targetX - state.player.position.x) * 0.2;
+
+    // 달리기 애니메이션
+    animateRunning(state.player);
+
+    // 플레이어를 앞으로 이동 (z+ 방향으로 계속 전진)
+    state.player.position.z += state.gameSpeed;
+
+    // 플레이어 위치 기준으로 도로 세그먼트를 재배치해서 무한 도로처럼 보이게 함
+    const baseIndex = Math.floor(state.player.position.z / state.roadLength);
+    state.roadSegments.forEach((seg, i) => {
+        const index = baseIndex + i;
+        seg.position.z = index * state.roadLength;
+    });
+
+    // 카메라 위치 보정: 캐릭터 뒤쪽·위에서 따라가기
+    state.camera.position.x += (state.player.position.x - state.camera.position.x) * 0.1;
+    state.camera.position.y = 6;
+    state.camera.position.z = state.player.position.z - 10;
+    state.camera.lookAt(state.player.position.x, 2, state.player.position.z + 20);
+
+    // 여러 세트 중, 플레이어 근처를 지나는 세트마다 한 번씩 판정
+    const thresholdZ = state.player.position.z + 2;
+    state.problemSets.forEach((set) => {
+        if (set.resolved) return;
+        if (!Array.isArray(set.bins) || set.bins.length !== 3) return;
+        const leadBin = set.bins[0];
+        if (!leadBin.mesh) return;
+
+        // 세트의 선두 쓰레기통이 플레이어 z 근처에 도달했을 때 판정
+        if (leadBin.mesh.position.z <= thresholdZ) {
+            const chosenLane = state.playerLane;
+            const chosenBin = set.bins[chosenLane];
+            const correctId = set.problem.answer;
+            const isCorrect = chosenBin.id === correctId;
+
+            if (isCorrect) {
+                state.score += 10;
+                showScoreEffect(10);
+                showFeedback(t('feedbackCorrect'), true);
+            } else {
+                state.score -= 10;
+                showScoreEffect(-10);
+                const correctBin =
+                    state.regionData.bins.find((b) => b.id === correctId) || {};
+                const localizedQuestion =
+                    state.language === 'en' && set.problem.question_en
+                        ? set.problem.question_en
+                        : set.problem.question;
+                const localizedYourAnswer =
+                    state.language === 'en' && chosenBin.name_en
+                        ? chosenBin.name_en
+                        : chosenBin.name;
+                const localizedCorrectAnswer =
+                    state.language === 'en' && correctBin.name_en
+                        ? correctBin.name_en
+                        : correctBin.name || correctId;
+                const localizedExplanation =
+                    state.language === 'en' && set.problem.explanation_en
+                        ? set.problem.explanation_en
+                        : set.problem.explanation || '';
+                state.incorrectAnswers.push({
+                    question: localizedQuestion,
+                    yourAnswer: localizedYourAnswer,
+                    correctAnswer: localizedCorrectAnswer,
+                    explanation: localizedExplanation,
+                });
+                showFeedback(t('feedbackWrong'), false);
+            }
+
+            set.resolved = true;
+
+            // 다음 미해결 세트를 기준으로 상단 문제 패널 텍스트 갱신
+            updateQuestionPanelForNextSet();
+        }
+    });
+
+    // 모든 세트가 판정 완료되면 게임 종료
+    const allResolved =
+        state.problemSets.length > 0 && state.problemSets.every((s) => s.resolved);
+    if (allResolved) {
+        endGame();
+        return;
+    }
+
+    state.renderer.render(state.scene, state.camera);
+}
+
+// 게임 시작
+async function startGame() {
+    // 이전 게임이 있었다면 상태/씬을 정리
+    resetGameState();
+
+    initThreeJS();
+    await loadRegionData();
+    createRoad();
+    createPlayer();
+    // JSON의 모든 문제를 세트로 만들어, 간격을 두고 배치
+    createAllProblemSets();
+    setupKeyboardControls();
+
+    state.score = 0;
+    state.gameTime = 0;
+    state.incorrectAnswers = [];
+    state.isPlaying = true;
+
+    document.getElementById('intro').style.display = 'none';
+    document.getElementById('scoreBox').style.display = 'block';
+    // 상단 문제 패널에서 현재/다음 문제 텍스트를 보여준다
+    updateQuestionPanelForNextSet();
+    updateHud();
+    gameLoop();
+}
+
+// 다시 시작 시 이전 Three.js 씬/렌더러 및 상태 정리
+function resetGameState() {
+    // 애니메이션 루프 정지
+    if (state.animationId) {
+        cancelAnimationFrame(state.animationId);
+        state.animationId = null;
+    }
+
+    // 기존 렌더러 캔버스 제거
+    const container = document.getElementById('gameContainer');
+    if (state.renderer && container && state.renderer.domElement.parentNode === container) {
+        container.removeChild(state.renderer.domElement);
+    }
+
+    // Three.js 리소스 정리 (간단 버전)
+    if (state.scene) {
+        while (state.scene.children.length > 0) {
+            state.scene.remove(state.scene.children[0]);
+        }
+    }
+
+    state.scene = null;
+    state.camera = null;
+    state.renderer = null;
+    state.player = null;
+    state.roadSegments = [];
+    state.environmentObjects = [];
+    state.problemSets = [];
+    state.incorrectAnswers = [];
+    state.playerLane = 1;
+    state.isPlaying = false;
+    state.gameTime = 0;
+}
+
+// 창 크기 변경
+function handleResize() {
+    if (!state.camera || !state.renderer) return;
+    state.camera.aspect = window.innerWidth / window.innerHeight;
+    state.camera.updateProjectionMatrix();
+    state.renderer.setSize(window.innerWidth, window.innerHeight);
+}
+
+// DOM 준비 후
+document.addEventListener('DOMContentLoaded', () => {
+    // 초기 언어를 UI에 반영
+    applyLanguageToUI();
+
+    // 언어 토글 버튼 이벤트
+    const languageSelect = document.getElementById('languageSelect');
+    if (languageSelect) {
+        languageSelect.value = state.language;
+        languageSelect.addEventListener('change', (e) => {
+            state.language = e.target.value;
+            applyLanguageToUI();
+        });
+    }
+
+    const loginForm = document.getElementById('loginForm');
+    const signupForm = document.getElementById('signupForm');
+    const loginBtn = document.getElementById('loginBtn');
+    const signupBtn = document.getElementById('signupBtn');
+    const signupConfirmBtn = document.getElementById('signupConfirmBtn');
+    const forgotPasswordBtn = document.getElementById('forgotPasswordBtn');
+    const loginCheck = document.getElementById('loginCheck');
+    const loginMessage = document.getElementById('loginMessage');
+
+    function getPlayerNameFromEmail(email) {
+        if (!email) return '';
+        const atIndex = email.indexOf('@');
+        if (atIndex > 0) {
+            return email.slice(0, atIndex);
+        }
+        return email;
+    }
+
+    async function mockLogin() {
+        const email = document.getElementById('loginEmail').value.trim();
+        const password = document.getElementById('loginPassword').value.trim();
+        if (!email || !password) {
+            alert('이메일과 비밀번호를 입력해주세요.');
+            return false;
+        }
+
+        // TODO: Cloudflare API 연동 시 실제 로그인 요청으로 교체
+        await new Promise((resolve) => setTimeout(resolve, 400));
+        return true;
+    }
+
+    async function mockSignup() {
+        const email = document.getElementById('signupEmail').value.trim();
+        const password = document.getElementById('signupPassword').value.trim();
+        const passwordConfirm = document
+            .getElementById('signupPasswordConfirm')
+            .value.trim();
+
+        if (!email || !password || !passwordConfirm) {
+            alert('이메일과 비밀번호를 모두 입력해주세요.');
+            return false;
+        }
+        if (password !== passwordConfirm) {
+            alert('비밀번호가 일치하지 않습니다.');
+            return false;
+        }
+
+        // TODO: Cloudflare API 연동 시 실제 회원가입 요청으로 교체
+        await new Promise((resolve) => setTimeout(resolve, 600));
+        return true;
+    }
+
+    function showLoginSuccessAndStartGame() {
+        if (loginCheck && loginMessage) {
+            loginCheck.classList.remove('hidden');
+            loginCheck.classList.add('login-success-anim');
+            loginMessage.textContent = '로그인 완료! 곧 게임이 시작됩니다.';
+        }
+
+        setTimeout(() => {
+            if (loginCheck) {
+                loginCheck.classList.remove('login-success-anim');
+            }
+            startGame();
+        }, 800);
+    }
+
+    if (loginBtn) {
+        loginBtn.addEventListener('click', async () => {
+            const email = document.getElementById('loginEmail').value.trim();
+            const ok = await mockLogin();
+            if (!ok) return;
+            state.playerName = getPlayerNameFromEmail(email);
+            showLoginSuccessAndStartGame();
+        });
+    }
+
+    if (signupBtn) {
+        signupBtn.addEventListener('click', () => {
+            if (!signupForm || !loginForm) return;
+            // 로그인 폼 대신 회원가입 폼을 보여줌
+            loginForm.classList.remove('active');
+            signupForm.classList.add('active');
+        });
+    }
+
+    if (signupConfirmBtn) {
+        signupConfirmBtn.addEventListener('click', async () => {
+            const ok = await mockSignup();
+            if (!ok) return;
+
+            const email = document.getElementById('signupEmail').value.trim();
+            state.playerName = getPlayerNameFromEmail(email);
+
+            if (loginCheck && loginMessage) {
+                loginCheck.classList.remove('hidden');
+                loginCheck.classList.add('login-success-anim');
+                loginMessage.textContent = '회원가입이 완료되었습니다! 곧 게임이 시작됩니다.';
+            }
+
+            setTimeout(() => {
+                if (loginCheck) {
+                    loginCheck.classList.remove('login-success-anim');
+                }
+                startGame();
+            }, 800);
+        });
+    }
+
+    if (forgotPasswordBtn) {
+        forgotPasswordBtn.addEventListener('click', () => {
+            alert('비밀번호 찾기 기능은 Cloudflare 연동 후 제공될 예정입니다.');
+        });
+    }
+
+    const restartBtn = document.getElementById('restartBtn');
+    if (restartBtn) {
+        restartBtn.addEventListener('click', () => {
+            // 요구사항: 인트로로 가지 않고 바로 게임 플레이 화면으로 재시작
+            const ending = document.getElementById('ending');
+            if (ending) ending.style.display = 'none';
+            startGame();
+        });
+    }
+
+    const reviewBtn = document.getElementById('reviewBtn');
+    if (reviewBtn) {
+        reviewBtn.addEventListener('click', () => {
+            showReviewScreen();
+        });
+    }
+
+    const rankingBtn = document.getElementById('rankingBtn');
+    if (rankingBtn) {
+        rankingBtn.addEventListener('click', () => {
+            const ending = document.getElementById('ending');
+            const ranking = document.getElementById('ranking');
+            if (!ranking || !ending) return;
+
+            ending.style.display = 'none';
+
+            // 더미 랭킹(1~3위) + 현재 플레이어 랭킹 계산
+            const dummyRankings = [
+                { name: 'GreenHero', score: 480 },
+                { name: 'RecycleMaster', score: 420 },
+                { name: 'EcoRunner', score: 380 },
+            ];
+
+            const playerEntry = {
+                name: state.playerName || 'You',
+                score: state.score,
+            };
+
+            const combined = [...dummyRankings, playerEntry];
+            combined.sort((a, b) => b.score - a.score);
+
+            const rankingList = document.getElementById('rankingList');
+            const myRankText = document.getElementById('myRankText');
+            if (rankingList) {
+                let html = '<table style="width: 100%; text-align: left; border-collapse: collapse;">';
+                html += '<thead><tr><th>순위</th><th>이름</th><th>점수</th></tr></thead><tbody>';
+                combined.forEach((r, idx) => {
+                    if (idx > 2 && r !== playerEntry) return; // 상위 3위 + 플레이어만 표시
+                    const displayRank = idx + 1;
+                    html += `<tr><td style="padding: 8px;">${displayRank}</td><td style="padding: 8px;">${r.name}</td><td style="padding: 8px;">${r.score}점</td></tr>`;
+                });
+                html += '</tbody></table>';
+                rankingList.innerHTML = html;
+            }
+
+            if (myRankText) {
+                const myIndex = combined.findIndex(
+                    (r) => r.name === playerEntry.name && r.score === playerEntry.score
+                );
+                const myRank = myIndex >= 0 ? myIndex + 1 : '랜덤';
+                myRankText.textContent = `나의 랭킹: ${myRank}등`;
+            }
+
+            ranking.style.display = 'flex';
+        });
+    }
+
+    const reviewRestartBtn = document.getElementById('reviewRestartBtn');
+    if (reviewRestartBtn) {
+        reviewRestartBtn.addEventListener('click', () => {
+            const review = document.getElementById('review');
+            if (review) review.style.display = 'none';
+            startGame();
+        });
+    }
+
+    const reviewBackBtn = document.getElementById('reviewBackBtn');
+    if (reviewBackBtn) {
+        reviewBackBtn.addEventListener('click', () => {
+            const review = document.getElementById('review');
+            if (review) review.style.display = 'none';
+        });
+    }
+
+    const rankingBackBtn = document.getElementById('rankingBackBtn');
+    if (rankingBackBtn) {
+        rankingBackBtn.addEventListener('click', () => {
+            const ranking = document.getElementById('ranking');
+            const ending = document.getElementById('ending');
+            if (ranking) ranking.style.display = 'none';
+            if (ending) ending.style.display = 'flex';
+        });
+    }
+
+    const reviewScreen = document.getElementById('reviewScreen');
+    if (reviewScreen) {
+        reviewScreen.addEventListener('click', () => {
+            const review = document.getElementById('review');
+            if (review) review.style.display = 'block';
+        });
+    }
+
+    const rankingScreen = document.getElementById('rankingScreen');
+    if (rankingScreen) {
+        rankingScreen.addEventListener('click', () => {
+            const ranking = document.getElementById('ranking');
+            if (ranking) ranking.style.display = 'block';
+        });
+    }
+
+    window.addEventListener('resize', handleResize);
+});

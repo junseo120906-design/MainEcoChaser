@@ -116,31 +116,32 @@ app.post('/login', (req, res) => {
  * [점수 저장 API]
  */
 app.post('/submit-score', (req, res) => {
-    const { userId, score } = req.body;
+    const { userId, score, mistakes, wrongItems } = req.body;
     console.log('점수 저장 요청 받음:', '유저ID:', userId, '점수:', score);
 
-    // 1. 전체 DB를 읽어옴
     const db = readDb();
 
-    // 2. users 배열에서 닉네임을 찾음
     const user = db.users.find(u => u.id === userId);
-
     if (!user) {
         return res.status(404).json({ success: false, message: '점수를 저장할 사용자를 찾을 수 없습니다.' });
     }
-    
+
+    const safeWrongItems = Array.isArray(wrongItems) ? wrongItems : [];
+    const safeMistakes = Number.isFinite(mistakes) ? mistakes : safeWrongItems.length;
+
     const newScore = {
         userId: userId,
-        score: score,
-        nickname: user.nickname 
+        score: Number(score),
+        mistakes: Number(safeMistakes),
+        wrongItems: safeWrongItems,
+        nickname: user.nickname,
+        createdAt: Date.now()
     };
 
-    // 3. scores 배열에 새 점수를 추가
     db.scores.push(newScore);
-    // 4. 변경된 전체 db 객체를 파일에 씀
     writeDb(db);
 
-    console.log('점수 저장 성공:', user.nickname, score);
+    console.log('점수 저장 성공:', user.nickname, score, '오답:', newScore.mistakes);
     res.status(201).json({ success: true, message: '점수가 성공적으로 등록되었습니다.' });
 });
 
@@ -151,14 +152,37 @@ app.get('/ranking', (req, res) => {
     console.log('랭킹 조회 요청 받음');
 
     const db = readDb();
-    const scores = db.scores; // 👈 db에서 scores 배열만 가져옴
+    const scores = db.scores || [];
 
-    const sortedScores = scores.sort((a, b) => b.score - a.score);
-    const top10 = sortedScores.slice(0, 10);
+    // 1) 원본 배열을 건드리지 않도록 복사한 뒤, 피셔-예이츠로 섞기
+    const shuffled = [...scores];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
 
-    const rankingData = top10.map(s => ({
+    // 2) 섞인 배열에서 상위 10개만 추출
+    const picked = shuffled.slice(0, 10);
+
+    // 3) 그 10개를 점수 내림차순(동점 시 오답 적은 순, 그다음 기록 시간 순)으로 정렬
+    const sortedPicked = picked.sort((a, b) => {
+        const aScore = Number(a.score) || 0;
+        const bScore = Number(b.score) || 0;
+        if (aScore !== bScore) return bScore - aScore; // 점수 높은 순
+
+        const aMistakes = Number(a.mistakes) || 0;
+        const bMistakes = Number(b.mistakes) || 0;
+        if (aMistakes !== bMistakes) return aMistakes - bMistakes; // 오답 적은 순
+
+        const aTime = Number(a.createdAt) || 0;
+        const bTime = Number(b.createdAt) || 0;
+        return aTime - bTime; // 먼저 기록한 순
+    });
+
+    const rankingData = sortedPicked.map(s => ({
         nickname: s.nickname,
-        score: s.score
+        score: s.score,
+        mistakes: Number(s.mistakes) || 0
     }));
 
     console.log('랭킹 데이터 전송:', rankingData.length, '개');

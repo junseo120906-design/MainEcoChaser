@@ -1,0 +1,129 @@
+/* ===================
+   About Page (게임 소개)
+=================== */
+
+/* 페이지 메인 컨텐츠 영역의 상하 여백을 줍니다 */
+.about-page-wrapper {
+    padding-top: 60px;
+    padding-bottom: 60px;
+    background-color: #f9f9f9; /* 메인 페이지 섹션과 동일한 배경색 */
+}
+
+.about-container {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 0 20px; /* 좌우 여백 */
+    text-align: center;
+}
+
+.about-page-wrapper h2 {
+    font-size: 2.5rem;
+    margin-bottom: 15px;
+    color: #333;
+}
+
+.about-subtitle {
+    font-size: 1.1rem;
+    color: #666;
+    margin-bottom: 40px;
+    line-height: 1.6;
+}
+
+.about-content {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 40px;
+    text-align: left;
+}
+
+/* 768px 이하 (태블릿/모바일) 화면에서는 세로로 쌓이도록 설정 */
+@media (max-width: 768px) {
+    .about-content {
+        flex-direction: column;
+    }
+}
+
+.about-visual {
+    flex: 1; /* 1:1 비율로 공간 차지 */
+}
+
+.about-visual img {
+    width: 100%;
+    border-radius: 10px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+}
+
+.about-gameplay {
+    flex: 1; /* 1:1 비율로 공간 차지 */
+}
+
+.about-gameplay h3 {
+    font-size: 1.8rem;
+    margin-bottom: 20px;
+    color: #333;
+}
+
+.about-gameplay ul {
+    list-style: none;
+    padding-left: 0;
+    margin-bottom: 30px;
+}
+
+.about-gameplay li {
+    font-size: 1rem;
+    color: #555;
+    margin-bottom: 15px;
+    line-height: 1.5;
+}
+
+.about-gameplay li strong {
+    color: #333;
+    display: block; /* 강조 텍스트를 위로 올림 */
+    font-size: 1.1rem;
+    margin-bottom: 3px;
+}
+
+/* 네비게이션 바 '활성' 메뉴 스타일 (선택 사항) */
+.navbar .nav-menu a.active {
+    color: #007bff; /* 예시 색상 (테마에 맞게 수정) */
+    font-weight: bold;
+}
+
+/* 제목 스타일 */
+.about-container h2 {
+    font-size: 2.5rem;
+    margin-bottom: 15px;
+    color: #333;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+}
+
+.title-with-icon {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.title-icon {
+    width: 50px;  /* 이미지 크기 조정 */
+    height: 50px;  /* 이미지 크기 조정 */
+    object-fit: contain;
+    vertical-align: middle;
+}
+
+/* 모바일 반응형 */
+@media (max-width: 768px) {
+    .about-container h2 {
+        font-size: 2rem;
+        flex-direction: column;
+        gap: 10px;
+    }
+    
+    .title-icon {
+        width: 40px;
+        height: 40px;
+    }
+}

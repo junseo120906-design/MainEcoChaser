@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>TrashChaser - 쓰레기 분리수거 러닝 게임</title>
+	<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&display=swap" rel="stylesheet">
+	<link rel="stylesheet" href="style.css">
+</head>
+<body>
+	<div id="gameContainer"></div>
+
+	<div id="scoreBox"><span id="scoreLabel"></span> <span id="score">0</span></div>
+	<div id="scoreEffect"></div>
+	<div id="timerBox"><span id="timerLabel">남은 시간:</span> <span id="timeLeft">30</span><span id="timeUnit">초</span></div>
+	<div id="tierBadgeHud"></div>
+
+	<div id="questionPanel">
+		<div id="questionText">문제가 표시됩니다</div>
+	</div>
+	<div id="feedbackMessage"></div>
+
+	<div id="intro" class="screen">
+		<div class="container">
+			<div id="introHeader">
+				<img id="ecoLogo" src="logo.png" alt="EcoChaser 로고">
+			</div>
+			<p id="introDescription">위에서 내려다보는 도시 위로 달리면서 쓰레기를 올바르게 분리수거하세요!</p>
+			<div class="intro-section">
+				<label for="languageSelect">언어</label>
+				<select id="languageSelect">
+					<option value="ko">한국어</option>
+					<option value="en">English</option>
+				</select>
+			</div>
+			<div class="intro-section">
+				<label for="regionSelect">지역 선택</label>
+				<select id="regionSelect">
+					<option value="regions/kr_seoul.json">서울특별시</option>
+					<option value="regions/kr_busan.json">부산광역시</option>
+					<option value="regions/kr_incheon.json">인천광역시</option>
+					<option value="regions/kr_cheonan.json">천안시</option>
+				</select>
+			</div>
+			<div id="authForms">
+				<div id="loginForm" class="auth-form active">
+					<input type="email" id="loginEmail" placeholder="이메일">
+					<input type="password" id="loginPassword" placeholder="비밀번호">
+					<div class="auth-button-row">
+						<button type="button" id="loginBtn">로그인</button>
+						<button type="button" id="signupBtn" class="secondary">회원가입</button>
+					</div>
+					<button type="button" id="forgotPasswordBtn" class="sub-button">비밀번호 찾기</button>
+					<button type="button" class="intro-home-btn intro-home-inline" onclick="window.location.href='../../index.html'">← 홈으로 돌아가기</button>
+				</div>
+				<div id="signupForm" class="auth-form">
+					<input type="email" id="signupEmail" placeholder="이메일">
+					<input type="password" id="signupPassword" placeholder="비밀번호">
+					<input type="password" id="signupPasswordConfirm" placeholder="비밀번호 확인">
+					<div class="auth-button-row">
+						<button type="button" id="signupConfirmBtn">확인</button>
+					</div>
+				</div>
+			</div>
+			<div id="loginStatus">
+				<div id="loginCheck" class="hidden"></div>
+				<p id="loginMessage"></p>
+			</div>
+		</div>
+	</div>
+
+	<!-- 게임 종료 확인 모달 -->
+	<div id="exitModal" class="modal hidden">
+		<div class="modal-content">
+			<p>게임을 나가시겠습니까?<br>저장되지 않은 게임은 점수에 반영되지 않습니다.</p>
+			<div class="modal-buttons">
+				<button type="button" id="exitConfirmBtn">확인</button>
+				<button type="button" id="exitCancelBtn" class="secondary">취소</button>
+			</div>
+		</div>
+	</div>
+
+	<div id="ending" class="screen">
+		<div class="container">
+			<h2 id="endingTitle">게임 종료!</h2>
+			<p><span id="finalScoreLabel">최종 점수:</span> <span id="finalScore">0</span><span id="finalScoreUnit">점</span></p>
+			<div id="tierSummary">
+				<div id="tierBadgeEnding"></div>
+				<div id="tierInfo">
+					<p id="tierNameText"></p>
+					<div id="tierProgress">
+						<div id="tierProgressBar"></div>
+					</div>
+					<p id="tierProgressText"></p>
+				</div>
+			</div>
+			<p id="endingMessageText"></p>
+			<div class="button-row">
+				<button id="reviewBtn">확인</button>
+				<button id="restartBtn">다시 시작</button>
+				<button id="rankingBtn">랭킹 보기</button>
+			</div>
+		</div>
+	</div>
+
+	<div id="review" class="screen" style="display: none;">
+		<div class="container">
+			<h2>오답노트</h2>
+			<div id="reviewList"></div>
+			<div class="button-row">
+				<button id="reviewRestartBtn">다시 시작</button>
+				<button id="reviewBackBtn">닫기</button>
+			</div>
+		</div>
+	</div>
+
+	<div id="ranking" class="screen" style="display: none;">
+		<div class="container">
+			<h2 id="rankingTitle">🏆 랭킹</h2>
+			<div id="rankingList"></div>
+			<p id="myRankText"></p>
+			<div class="button-row">
+				<button id="rankingBackBtn">확인</button>
+			</div>
+		</div>
+	</div>
+
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+	<script src="main.js"></script>
+</body>
+</html>

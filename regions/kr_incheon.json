@@ -1,0 +1,36 @@
+{
+  "regionId": "kr_incheon",
+  "regionName": "인천광역시",
+  "bins": [
+    { "id": "general", "name": "일반쓰레기", "color": "0x4CAF50" },
+    { "id": "recycle", "name": "재활용", "color": "0x2196F3" },
+    { "id": "food", "name": "음식물", "color": "0xFFC107" }
+  ],
+  "problems": [
+    {
+      "question": "인천에서 커피 찌꺼기는 어떻게 버려야 할까요?",
+      "answer": "food",
+      "explanation": "인천에서는 커피 찌꺼기는 음식물 쓰레기로 분류됩니다."
+    },
+    {
+      "question": "인천에서 고무장갑은 어떻게 버려야 할까요?",
+      "answer": "general",
+      "explanation": "인천에서는 고무장갑은 일반쓰레기로 분류됩니다."
+    },
+    {
+      "question": "인천에서 스티로폼 용기는 어떻게 버려야 할까요?",
+      "answer": "recycle",
+      "explanation": "인천에서는 깨끗한 스티로폼 용기는 재활용이 가능합니다. 이물질을 제거하고 버려주세요."
+    },
+    {
+      "question": "인천에서 유리병은 어떻게 버려야 할까요?",
+      "answer": "recycle",
+      "explanation": "인천에서는 유리병은 재활용이 가능합니다. 깨지지 않게 주의하여 버려주세요."
+    },
+    {
+      "question": "인천에서 생선 비늘은 어떻게 버려야 할까요?",
+      "answer": "food",
+      "explanation": "인천에서는 생선 비늘은 음식물 쓰레기로 분류됩니다. 물기를 제거한 후 버려주세요."
+    }
+  ]
+}

@@ -1,0 +1,46 @@
+{
+  "regionId": "kr_seoul",
+  "regionName": "서울특별시",
+  "bins": [
+    { "id": "general", "name": "일반", "name_en": "General Waste", "color": 5025616 },
+    { "id": "recycle", "name": "재활용", "name_en": "Recyclables", "color": 2201331 },
+    { "id": "food", "name": "음식물", "name_en": "Food Waste", "color": 16761095 }
+  ],
+  "problems": [
+    {
+      "question": "서울에서 1회용 컵은 어떻게 버려야 할까요?",
+      "question_en": "In Seoul, how should you dispose of a single-use cup?",
+      "answer": "general",
+      "explanation": "1회용 컵은 일반쓰레기로 버려야 합니다. 재활용이 불가능합니다.",
+      "explanation_en": "In Seoul, single-use cups must go into general waste. They cannot be recycled."
+    },
+    {
+      "question": "서울에서 생선 뼈는 어떻게 버려야 할까요?",
+      "question_en": "In Seoul, how should you dispose of fish bones?",
+      "answer": "food",
+      "explanation": "생선 뼈는 음식물 쓰레기로 분류됩니다. 물기를 최대한 제거한 후 버려주세요.",
+      "explanation_en": "In Seoul, fish bones go into food waste. Remove as much moisture as possible before disposing."
+    },
+    {
+      "question": "서울에서 종이팩은 어떻게 버려야 할까요?",
+      "question_en": "In Seoul, how should you dispose of paper cartons?",
+      "answer": "recycle",
+      "explanation": "종이팩은 재활용이 가능합니다. 내용물을 비우고 깨끗이 헹군 후 재활용으로 버려주세요.",
+      "explanation_en": "In Seoul, paper cartons are recyclable. Empty them, rinse well, and put them into recycling."
+    },
+    {
+      "question": "서울에서 스티로폼 용기는 어떻게 버려야 할까요?",
+      "question_en": "In Seoul, how should you dispose of a clean Styrofoam container?",
+      "answer": "recycle",
+      "explanation": "깨끗한 스티로폼 용기는 재활용이 가능합니다. 이물질을 제거하고 버려주세요.",
+      "explanation_en": "In Seoul, clean Styrofoam containers are recyclable. Remove any contaminants before disposal."
+    },
+    {
+      "question": "서울에서 일회용 기저귀는 어떻게 버려야 할까요?",
+      "question_en": "In Seoul, how should you dispose of disposable diapers?",
+      "answer": "general",
+      "explanation": "일회용 기저귀는 일반쓰레기로 버려야 합니다. 변기로 배출하지 마세요.",
+      "explanation_en": "In Seoul, disposable diapers must go into general waste. Do not flush them down the toilet."
+    }
+  ]
+}

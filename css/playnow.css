@@ -1,0 +1,195 @@
+/* playnow.css - 게임 스타일 */
+
+/* 기본 게임 영역 스타일 */
+.game-container {
+    max-width: 1200px;
+    margin: 40px auto;
+    padding: 20px;
+    background-color: #f9f9f9;
+    border-radius: 10px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    text-align: center;
+}
+
+.game-area {
+    width: 100%;
+    height: 500px;
+    background-color: #e0e0e0;
+    margin: 20px 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+}
+
+/* 게임 캔버스 스타일 */
+#gameCanvasElement {
+    display: block;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    position: relative;
+    z-index: 1;
+    background-color: #d0e8ff; /* 기본 배경색 */
+}
+
+/* 게임 컨테이너 */
+#game-container {
+    position: relative;
+    border-radius: 8px;
+    overflow: hidden;
+    margin: 0 auto;
+    max-width: 800px;
+}
+
+/* UI 요소 스타일 */
+#ui-container {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    right: 10px;
+    display: flex;
+    justify-content: space-between;
+    font-size: 20px;
+    font-weight: bold;
+    color: #1a5276;
+    pointer-events: none;
+    font-family: inherit;
+    text-shadow: 1px 1px #ecf0f1;
+    z-index: 2;
+}
+
+#ui-scores {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+#ui-stage {
+    font-size: 16px;
+    color: #2c3e50;
+}
+
+/* 모달 스타일 */
+.modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.7);
+    z-index: 1000;
+    justify-content: center;
+    align-items: center;
+}
+
+.modal-content {
+    background-color: white;
+    padding: 30px;
+    border-radius: 12px;
+    max-width: 500px;
+    width: 90%;
+    text-align: center;
+    position: relative;
+    animation: modalFadeIn 0.3s ease-out;
+}
+
+@keyframes modalFadeIn {
+    from { opacity: 0; transform: translateY(-20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.modal h2 {
+    color: #2c3e50;
+    margin-bottom: 20px;
+    font-family: inherit;
+}
+
+.modal p {
+    margin-bottom: 20px;
+    line-height: 1.6;
+    color: #34495e;
+}
+
+/* 버튼 스타일 */
+.btn {
+    display: inline-block;
+    padding: 12px 24px;
+    margin: 8px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 16px;
+    font-weight: bold;
+    text-decoration: none;
+    transition: all 0.3s ease;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.btn-primary {
+    background-color: var(--brand-400);
+    color: white;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+
+.btn-secondary {
+    background-color: #3498db;
+    color: white;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+
+.btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 8px rgba(0,0,0,0.15);
+}
+
+.btn:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+/* 반응형 디자인 */
+@media (max-width: 768px) {
+    .game-container {
+        margin: 20px 10px;
+        padding: 15px;
+    }
+    
+    .game-area {
+        height: 400px;
+    }
+    
+    #ui-container {
+        font-size: 16px;
+    }
+    
+    .btn {
+        padding: 10px 20px;
+        font-size: 14px;
+    }
+}
+/* 게임 프레임 컨테이너 */
+.game-frame-container {
+    width: 100%;
+    max-width: 800px;
+    height: 600px;
+    margin: 20px auto;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* 반응형 디자인 */
+@media (max-width: 900px) {
+    .game-frame-container {
+        height: 500px;
+    }
+}
+
+@media (max-width: 768px) {
+    .game-frame-container {
+        height: 400px;
+        margin: 10px auto;
+    }
+}

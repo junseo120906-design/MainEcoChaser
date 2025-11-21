@@ -1,0 +1,128 @@
+/*
+ * css/signup.css
+ * 회원가입/로그인 폼 전용 스타일시트
+ */
+
+/* 폼을 감싸는 흰색 카드 */
+.auth-container {
+    max-width: 500px;
+    /* 상하 60px, 좌우 자동(가운데 정렬) */
+    margin: 100px auto; 
+    padding: 40px;
+    background: #FFFFFF;
+    /* style.css의 .category-card와 유사하게 */
+    border-radius: 14px; 
+    box-shadow: 0 8px 24px rgba(0,0,0,.06);
+    border: 1px solid #e5e7eb;
+}
+
+/* 폼 제목 (h2) */
+.auth-container h2 {
+    text-align: center;
+    font-size: 2rem;
+    font-weight: 700;
+    /* style.css의 --brand-700 (진한 녹색) */
+    color: var(--brand-700, #111827); 
+    margin-bottom: 2rem;
+}
+
+/* 폼 자체 */
+.auth-form {
+    width: 100%;
+}
+
+/* 라벨 + 인풋을 감싸는 그룹 */
+.form-group {
+    margin-bottom: 20px;
+}
+
+.form-group label {
+    display: block;
+    font-weight: 600;
+    color: var(--dark, #1E3A2B);
+    margin-bottom: 8px;
+    font-size: 0.9rem;
+}
+
+/* 텍스트 입력창 스타일 */
+.form-group input[type="text"],
+.form-group input[type="password"] {
+    width: 100%;
+    padding: 12px 15px;
+    border: 1px solid #DDDDDD;
+    border-radius: 6px;
+    font-size: 1rem;
+    font-family: inherit;
+    color: #333;
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+/* 입력창 포커스(클릭) 시 */
+.form-group input[type="text"]:focus,
+.form-group input[type="password"]:focus {
+    /* style.css의 --primary (메인 녹색) */
+    border-color: var(--primary, #111827); 
+    box-shadow: 0 0 8px rgba(31, 41, 55, 0.25);
+    outline: none;
+}
+
+/*
+ * 버튼 스타일 
+ * (기본 .btn 스타일은 style.css에서 가져옴)
+ */
+.auth-form .btn {
+    width: auto; /* 텍스트만 보이도록 폭 자동 */
+    padding: 0;
+    font-size: 1rem;
+    font-weight: 600;
+    margin-top: 10px;
+    text-transform: none;
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+}
+/* 폼 제출 버튼을 텍스트 링크처럼 */
+.auth-form .btn.btn-primary { background: transparent; color: var(--primary); border: none; padding: 0; text-decoration: none; }
+.auth-form .btn.btn-primary:hover { color: var(--primary-dark); text-decoration: none; }
+
+/* 결과 메시지 (JS가 사용) */
+.form-message {
+    text-align: center;
+    font-size: 0.95rem;
+    font-weight: 600;
+    margin-top: 20px;
+    /* 기본적으로 보이지 않도록 */
+    color: transparent; 
+}
+
+/* JS가 이 클래스를 추가하면 보임 */
+.form-message.success {
+    /* style.css의 --brand-400 (성공 녹색) */
+    color: var(--info, #2563EB); 
+}
+.form-message.error {
+    /* style.css의 --accent (에러 빨강) */
+    color: var(--accent, #FF6B6B); 
+}
+
+
+/* 하단 "로그인" 링크 */
+.auth-link {
+    text-align: center;
+    margin-top: 25px;
+    font-size: 0.9rem;
+    color: #555;
+}
+
+.auth-link a {
+    /* style.css의 --primary (메인 녹색) */
+    color: var(--primary, #4CAF50);
+    font-weight: 600;
+    text-decoration: underline;
+}
+
+.auth-link a:hover {
+    /* style.css의 --primary-dark (진한 녹색) */
+    color: var(--primary-dark, #388E3C);
+}

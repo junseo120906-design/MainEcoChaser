@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>EcoChaser</title>
+  <link rel="stylesheet" href="css/style.css"/>
+  <style>
+    /* 기본은 홈 모드: 히어로만 표시 */
+    body.mode-home .hero { display: block; padding-top: 110px;}
+    body.mode-home #ranking { display: none; }
+
+    /* 랭킹 모드: 랭킹만 표시 (두 번째 스샷처럼) */
+    body.mode-ranking .hero { display: none; }
+    body.mode-ranking #ranking {
+        display: block;
+        padding-top: 64px;
+        padding-bottom: 80px;
+        min-height: calc(100vh - 160px); /* 헤더/푸터 제외하고 꽉 차게 */
+    }
+    body.mode-ranking .leaderboard { margin-top: 24px; }
+  </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="navbar-container">
+            <a href="index.html" class="logo-link">
+                <img src="image/Logo.png" alt="TrashHunter Logo" class="logo-img">
+            </a>
+            <ul class="nav-menu">
+                <li><a href="ranking.html">경쟁 순위</a></li>
+            </ul>
+        <div class="auth-menu">
+            <div id="logged-out-menu">
+                <a href="signup.html" class="btn-signup">회원가입</a>
+                <a href="login.html" class="btn-login">로그인</a>
+        </div>
+
+        <div id="logged-in-menu" style="display: none; align-items: center;">
+            <span id="user-nickname-display" style="margin-right: 15px; font-weight: 600; color: var(--dark);"></span>
+        
+            <a href="#" id="logout-button" class="btn-login" style="border-color: var(--accent); color: var(--accent);">로그아웃</a>
+        </div>
+    </div>
+    </nav>
+
+  <main class="main-content">
+    <section class="hero">
+      <div class="hero-grid">
+        <div class="hero-left">
+          <div class="hero-content">
+            <h1>Eco Chaser</h1>
+            <p>쓰레기를 분리수거하며 환경을 지키는 
+                <br>실시간 참여형 게임</p>
+            <div class="cta-buttons">
+              <a href="game/ecochaserGame/index.html" class="btn btn-primary">지금 플레이하기</a>
+            </div>
+          </div>
+        </div>
+        <div class="hero-right">
+          <div class="carousel">
+            <div class="carousel-track">
+              <article class="carousel-slide">
+                <span class="carousel-label">미션 하이라이트</span>
+                <h3>주말 해변 대청소</h3>
+                <p>플라스틱과 유리를 분리해서 수거하면 공동 목표 게이지가 채워져요.</p>
+                <div class="carousel-meters">
+                  <div class="carousel-meter"><span></span></div>
+                  <div class="carousel-meter"><span></span></div>
+                  <div class="carousel-meter"><span></span></div>
+                </div>
+              </article>
+              <article class="carousel-slide">
+                <span class="carousel-label">실시간 경쟁</span>
+                <h3>친구들과 순위 대결</h3>
+                <p>동네별 포인트를 모아 리더보드 상위권에 도전해 보세요.</p>
+                <div class="carousel-meters">
+                  <div class="carousel-meter"><span></span></div>
+                  <div class="carousel-meter"><span></span></div>
+                  <div class="carousel-meter"><span></span></div>
+                </div>
+              </article>
+              <article class="carousel-slide">
+                <span class="carousel-label">성장 보상</span>
+                <h3>친환경 배지 수집</h3>
+                <p>분리수거 미션을 달성할 때마다 희귀 배지를 잠금 해제하세요.</p>
+                <div class="carousel-meters">
+                  <div class="carousel-meter"><span></span></div>
+                  <div class="carousel-meter"><span></span></div>
+                  <div class="carousel-meter"><span></span></div>
+                </div>
+              </article>
+            </div>
+          </div>
+          </div>
+      </div>
+    </section>
+    <section class="game-intro" id="game-intro">
+      <div class="intro-header">
+        <div class="intro-header-left">
+          <h2>외국인 유학생과 기숙사생을 <br>위한 환경 인식 개선 게임</h2>
+        </div>
+        <div class="intro-header-right">
+          <h3>
+            이 게임은 외국인 유학생과 기숙사생이 다른 지역의 분리수거 기준을 쉽고 재미있게 익힐 수 있도록 설계된 환경 인식 개선 게임입니다.<br>
+            캐릭터가 다양한 지역을 여행하며 쓰레기를 올바른 통에 넣는 미션을 수행하고,
+            지역마다 다른 분리수거 규칙을 자연스럽게 학습합니다.
+            <br>누구나 즐길 수 있는 러너 스타일 게임으로, 실천보다 인식 개선에 <br>중점을 둡니다.
+          </h3>
+        </div>
+      </div>
+      <div class="intro-grid">
+        <article class="intro-card highlight">
+          <h3><strong>다채로운 학습 경험</strong></h3>
+          <p>지역별 분리수거 정보를 게임 스테이지로 재구성하여 복잡한 규칙도 직관적으로 학습합니다.</p>
+          <ul>
+            <li>단순한 이론이 아닌 행동 기반 인식 개선</li>
+            <li>러너형 진행 + 선택형 퀴즈 조합</li>
+            <li>번역 기능으로 외국인도 손쉽게 참여</li>
+          </ul>
+        </article>
+        <article class="intro-card highlight">
+          <h3><strong>차별화된 시스템</strong></h3>
+          <p>사용자 지역 정보를 JSON 데이터와 연동해 현실적인 미션과 정답을 자동 생성합니다.</p>
+          <ul>
+            <li>지역별 규칙을 반영한 몰입형 콘텐츠</li>
+            <li>게임 종료 후 오답 노트로 약점 보완</li>
+            <li>누구나 접근 가능한 직관적 인터페이스</li>
+          </ul>
+        </article>
+        <article class="intro-card highlight">
+          <h3><strong>전략적 게임성</strong></h3>
+          <p>실시간 러너 플레이에 전략 요소를 더해 교육 효과를 극대화하고 학습 지속성을 높입니다.</p>
+          <div class="intro-footnote">
+            지역별 규칙을 반영한 현실적인 콘텐츠와 전략적 게임성을 결합해 사용자에게 몰입감 있는 교육 경험을 제공합니다.
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <footer class="site-footer">
+    
+        <div class="footer-content">
+            <div class="footer-section">
+                <img src="image/Logo.png" alt="TrashHunter Logo" class="logo-img">
+            </div>
+            <div class="footer-section">
+                <h4>메뉴</h4>
+                <ul>
+                    <li><a href="ranking.html">경쟁 순위</a></li>
+                    <li><a href="login.html">로그인</a></li>
+                    <li><a href="signup.html">회원가입</a></li>
+                </ul>
+            </div>
+            <div class="footer-section">
+                <h4>연락처</h4>
+                <p>이메일: EcoChaser@jeiu.com</p>
+                <div class="social-links">
+                    <a href="#" class="social-icon">📱</a>
+                    <a href="#" class="social-icon">📘</a>
+                    <a href="#" class="social-icon">📸</a>
+                </div>
+            </div>
+        </div>
+        <div class="footer-bottom">
+            <p>&copy; 2025 Eco Chaser. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <script src="js/script.js"></script>
+</body>
+</html>
