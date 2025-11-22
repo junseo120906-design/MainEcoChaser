@@ -1,3 +1,42 @@
+// API 설정 - Workers URL이 준비되면 여기에 입력
+const API_BASE_URL = '';  // ''이면 fetch('/api/...') 형태
+const USE_API = true;     // D1에 바로 보내려면 true
+
+// localStorage 안전하게 사용하는 헬퍼 함수 (Safari/프라이빗 모드 대응)
+const safeLocalStorage = {
+    isAvailable: function() {
+        try {
+            const test = '__storage_test__';
+            localStorage.setItem(test, test);
+            localStorage.removeItem(test);
+            return true;
+        } catch(e) {
+            return false;
+        }
+    },
+    getItem: function(key) {
+        try {
+            if (this.isAvailable()) {
+                return localStorage.getItem(key);
+            }
+        } catch(e) {
+            console.warn('localStorage access blocked:', e);
+        }
+        return null;
+    },
+    setItem: function(key, value) {
+        try {
+            if (this.isAvailable()) {
+                localStorage.setItem(key, value);
+                return true;
+            }
+        } catch(e) {
+            console.warn('localStorage access blocked:', e);
+        }
+        return false;
+    }
+};
+
 const state = {
     scene: null,
     camera: null,
@@ -15,6 +54,8 @@ const state = {
     gameTime: 0,
     gameTimeLimit: 60, // 초
     regionData: null,
+    regionId: '', // 선택한 지역 ID (예: kr_seoul, kr_busan)
+    regionName: '', // 선택한 지역 이름 (예: 서울특별시)
     currentProblem: null,
     remainingProblems: [], // 이전 단일 세트 방식에서 사용 (현재는 미사용)
     currentQuestionSprite: null, // 이전 단일 세트 방식에서 사용 (현재는 미사용)
@@ -130,7 +171,7 @@ const i18n = {
         rankingTitle: '🏆 Ranking',
         finalScoreLabel: 'Final Score:',
         finalScoreUnit: 'pts',
-        restartButton: 'Play Again',
+        restartButton: 'Restart',
         noRecords: 'No records yet.',
         rankingHeaderRank: 'Rank',
         rankingHeaderName: 'Name',
@@ -163,7 +204,7 @@ const i18n = {
         exitConfirmButton: 'OK',
         exitCancelButton: 'Cancel',
         reviewTitle: 'Incorrect Answers',
-        reviewRestartButton: 'Play Again',
+        reviewRestartButton: 'Restart',
         reviewBackButton: 'Close',
         rankingBackButton: 'OK',
         rankingButton: 'View Ranking',
@@ -333,9 +374,13 @@ function initThreeJS() {
     state.camera.lookAt(0, 2, 20);
 
     const container = document.getElementById('gameContainer');
-    state.renderer = new THREE.WebGLRenderer({ antialias: true });
+    state.renderer = new THREE.WebGLRenderer({ 
+        antialias: false, // 성능 향상 (안티앨리어싱 끄기)
+        powerPreference: 'high-performance' // 고성능 GPU 우선
+    });
     state.renderer.setSize(container.clientWidth, container.clientHeight);
-    state.renderer.shadowMap.enabled = true;
+    state.renderer.shadowMap.enabled = false; // 그림자 끄기 (큰 성능 향상)
+    state.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // 고해상도 제한
     container.appendChild(state.renderer.domElement);
 
     const ambient = new THREE.AmbientLight(0xffffff, 0.8);
@@ -356,7 +401,8 @@ function createRoad() {
         side: THREE.DoubleSide,
     });
 
-    for (let i = 0; i < 3; i++) {
+    // 도로 세그먼트를 7개로 늘려서 시야 앞뒤 모두 여유롭게 유지 (앞/뒤 3개씩 + 현재)
+    for (let i = -3; i <= 3; i++) {
         const road = new THREE.Mesh(roadGeo, roadMat);
         road.rotation.x = -Math.PI / 2;
         road.position.set(0, 0, i * state.roadLength);
@@ -406,79 +452,75 @@ function createEnvironment() {
     const grassLeft = new THREE.Mesh(grassGeo, grassMat);
     grassLeft.rotation.x = -Math.PI / 2;
     grassLeft.position.set(-23, -0.01, envLength / 2);
-    grassLeft.receiveShadow = true;
     state.scene.add(grassLeft);
     
     // 오른쪽 잔디
     const grassRight = new THREE.Mesh(grassGeo, grassMat);
     grassRight.rotation.x = -Math.PI / 2;
     grassRight.position.set(23, -0.01, envLength / 2);
-    grassRight.receiveShadow = true;
     state.scene.add(grassRight);
     
-    // 나무 생성
-    for (let i = 0; i < 30; i++) {
+    // 나무 생성 (30 → 12개로 감소)
+    for (let i = 0; i < 12; i++) {
         const z = Math.random() * envLength - 20;
         const side = Math.random() > 0.5 ? 1 : -1;
         const x = side * (10 + Math.random() * 10);
         createTree(x, z);
     }
     
-    // 건물 생성
-    for (let i = 0; i < 12; i++) {
-        const z = i * (envLength / 10) - 20;
+    // 건물 생성 (12 → 6개로 감소)
+    for (let i = 0; i < 6; i++) {
+        const z = i * (envLength / 5) - 20;
         const side = Math.random() > 0.5 ? 1 : -1;
         const x = side * (18 + Math.random() * 8);
         const height = 8 + Math.random() * 12;
         createBuilding(x, z, height);
     }
     
-    // 구름 생성
-    for (let i = 0; i < 15; i++) {
+    // 구름 생성 (15 → 8개로 감소)
+    for (let i = 0; i < 8; i++) {
         const x = (Math.random() - 0.5) * 100;
         const y = 25 + Math.random() * 15;
         const z = Math.random() * state.roadLength * 3 - 20;
         createCloud(x, y, z);
     }
     
-    // 도로 표지판
-    for (let i = 0; i < 6; i++) {
-        const z = i * 40;
+    // 도로 표지판 (12 → 6개로 감소)
+    for (let i = 0; i < 3; i++) {
+        const z = i * 50;
         createRoadSign(-9, z);
-        createRoadSign(9, z + 20);
+        createRoadSign(9, z + 25);
     }
     
     // 분리수거 테마 요소들 추가
     
-    // 재활용 마크 조형물 (도로변에)
-    for (let i = 0; i < 4; i++) {
-        const z = i * 60 + 30;
-        const side = Math.random() > 0.5 ? 1 : -1;
+    // 재활용 마크 조형물 (4 → 2개로 감소)
+    for (let i = 0; i < 2; i++) {
+        const z = i * 80 + 30;
+        const side = i % 2 === 0 ? 1 : -1;
         createRecycleSymbol(side * 12, z);
     }
     
-    // 가로등 (태양광 패널 부착) - 도로와 충분히 떨어진 위치에 배치
-    for (let i = 0; i < Math.ceil(envLength / 20); i++) {
-        const z = i * 20 - 10;
-        // 도로 레인(-4, 0, 4)과 겹치지 않게 조금 더 바깥쪽에 배치
+    // 가로등 (간격을 넓혀서 개수 감소)
+    for (let i = 0; i < Math.ceil(envLength / 40); i++) {
+        const z = i * 40 - 10;
         createSolarStreetLight(-11, z);
-        createSolarStreetLight(11, z + 10);
+        createSolarStreetLight(11, z + 20);
     }
 
-    // 공원 벤치 & 쓰레기통 세트
-    for (let i = 0; i < Math.ceil(envLength / 50); i++) {
-        const z = i * 50 + 20;
-        const side = Math.random() > 0.5 ? 1 : -1;
+    // 공원 벤치 & 쓰레기통 세트 (간격 증가)
+    for (let i = 0; i < Math.ceil(envLength / 80); i++) {
+        const z = i * 80 + 20;
+        const side = i % 2 === 0 ? 1 : -1;
         createParkBenchSet(side * 11, z);
     }
 
-    // 재활용 센터 미니 건물
-    createRecycleCenter(25, envLength * 0.35);
-    createRecycleCenter(-25, envLength * 0.65);
+    // 재활용 센터 미니 건물 (1개만)
+    createRecycleCenter(25, envLength * 0.5);
     
-    // 환경 보호 광고판
-    for (let i = 0; i < 6; i++) {
-        const z = i * (envLength / 6) + 40;
+    // 환경 보호 광고판 (6 → 3개로 감소)
+    for (let i = 0; i < 3; i++) {
+        const z = i * (envLength / 3) + 40;
         const side = i % 2 === 0 ? 1 : -1;
         createEcoBillboard(side * 15, z);
     }
@@ -1435,10 +1477,18 @@ async function loadRegionData() {
     try {
         const res = await fetch(file);
         state.regionData = await res.json();
+        
+        // regionId와 regionName을 state에 저장
+        if (state.regionData) {
+            state.regionId = state.regionData.regionId || '';
+            state.regionName = state.regionData.regionName || '';
+        }
     } catch (e) {
         console.error('Failed to load region data', e);
         // 기본 값
         state.regionData = {
+            regionId: 'kr_seoul',
+            regionName: '서울특별시',
             bins: [
                 {
                     id: 'general',
@@ -1470,6 +1520,8 @@ async function loadRegionData() {
                 },
             ],
         };
+        state.regionId = 'kr_seoul';
+        state.regionName = '서울특별시';
     }
 }
 
@@ -1675,49 +1727,63 @@ function showFeedback(message, isCorrect) {
     }, 1200);
 }
 
-// 랭킹 저장
-function saveRanking(playerName, score) {
-    let rankings = JSON.parse(localStorage.getItem('ecoRunnerRankings')) || [];
-    rankings.push({
-        name: playerName,
-        score,
-        date:
-            state.language === 'en'
-                ? new Date().toLocaleDateString('en-US')
-                : new Date().toLocaleDateString('ko-KR'),
-    });
-    rankings.sort((a, b) => b.score - a.score);
-    rankings = rankings.slice(0, 10);
-    localStorage.setItem('ecoRunnerRankings', JSON.stringify(rankings));
+// 오답 말풍선 표시
+function showWrongAnswerBubble(yourAnswer, correctAnswer) {
+    const bubble = document.getElementById('wrongAnswerBubble');
+    const bubbleText = document.getElementById('bubbleText');
+    
+    if (!bubble || !bubbleText) return;
+    
+    // 말풍선 텍스트 생성
+    const message = state.language === 'ko' 
+        ? `이건 ${correctAnswer}예요!\n${yourAnswer}이(가) 아니에요.`
+        : `This is ${correctAnswer}!\nNot ${yourAnswer}.`;
+    
+    bubbleText.textContent = message;
+    
+    // 말풍선 표시
+    bubble.classList.remove('hidden', 'fade-out');
+    
+    // 2초 후 사라짐
+    setTimeout(() => {
+        bubble.classList.add('fade-out');
+        setTimeout(() => {
+            bubble.classList.add('hidden');
+        }, 300);
+    }, 2000);
 }
 
-// 랭킹 표시
-function displayRanking() {
-    const rankings = JSON.parse(localStorage.getItem('ecoRunnerRankings')) || [];
-    const listEl = document.getElementById('rankingList');
-    if (rankings.length === 0) {
-        listEl.innerHTML = `<p>${t('noRecords')}</p>`;
-        return;
+// 클립보드에 텍스트 복사
+async function copyToClipboard(text) {
+    try {
+        await navigator.clipboard.writeText(text);
+        const message = state.language === 'ko' 
+            ? '✅ 클립보드에 복사되었습니다!'
+            : '✅ Copied to clipboard!';
+        alert(message);
+    } catch (err) {
+        console.error('Failed to copy:', err);
+        // 폴백: textarea 사용
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.select();
+        try {
+            document.execCommand('copy');
+            const message = state.language === 'ko' 
+                ? '✅ 클립보드에 복사되었습니다!'
+                : '✅ Copied to clipboard!';
+            alert(message);
+        } catch (err2) {
+            console.error('Fallback copy failed:', err2);
+        }
+        document.body.removeChild(textarea);
     }
-
-    let html = '<table style="width: 100%; text-align: left; border-collapse: collapse;">';
-    html += `<thead><tr><th>${t('rankingHeaderRank')}</th><th>${t(
-        'rankingHeaderName'
-    )}</th><th>${t('rankingHeaderScore')}</th><th>${t(
-        'rankingHeaderDate'
-    )}</th></tr></thead><tbody>`;
-    rankings.forEach((r, idx) => {
-        const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `${idx + 1}.`;
-        html += `<tr>
-            <td style="padding: 8px;">${medal}</td>
-            <td style="padding: 8px;">${r.name}</td>
-            <td style="padding: 8px;">${r.score}${t('rankingScoreSuffix')}</td>
-            <td style="padding: 8px;">${r.date}</td>
-        </tr>`;
-    });
-    html += '</tbody></table>';
-    listEl.innerHTML = html;
 }
+
+// 기존 랭킹 함수들은 새로운 지역별 랭킹 시스템으로 대체됨 (삭제됨)
 
 function getTierInfo(score) {
     const tiers = [
@@ -1826,35 +1892,318 @@ function endGame() {
     // 티어 및 종료 메시지 반영
     updateEndingTierAndMessage();
 
-    // 🔽 여기서 서버에 점수 전송 (localStorage의 userId 사용, 직접 fetch)
-    try {
-        const userIdStr = localStorage.getItem('userId');
-        if (userIdStr) {
-            const userId = Number(userIdStr);
-            const wrongItems = state.incorrectAnswers || [];
-            const mistakes = Array.isArray(wrongItems) ? wrongItems.length : 0;
-
-            fetch('/api/submit-score', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    userId,
-                    score: Number(state.score) || 0,
-                    mistakes,
-                    wrongItems,
-                    locate: null, // 필요하면 지역 정보 넣기
-                }),
-            }).catch((e) => {
-                console.error('점수 전송 실패:', e);
-            });
-        } else {
-            console.warn('점수 전송 불가: localStorage에 userId가 없습니다.');
-        }
-    } catch (e) {
-        console.error('점수 전송 처리 중 오류:', e);
-    }
+    // 이름 입력 섹션 표시, 버튼들 비활성화
+    const nameInput = document.getElementById('endingPlayerName');
+    const nameSection = document.getElementById('nameInputSection');
+    const reviewBtn = document.getElementById('reviewBtn');
+    const rankingBtn = document.getElementById('rankingBtn');
+    
+    if (nameInput) nameInput.value = '';
+    if (nameSection) nameSection.style.display = 'block';
+    if (reviewBtn) reviewBtn.disabled = true;
+    if (rankingBtn) rankingBtn.disabled = true;
 
     document.getElementById('ending').style.display = 'flex';
+}
+
+// 점수 저장 (D1 DB API + localStorage 백업)
+async function saveScore(playerName, score, regionId, regionName) {
+    const timestamp = new Date().toISOString();
+    const scoreData = {
+        playerName,
+        score,
+        regionId,
+        regionName,
+        timestamp,
+    };
+
+    // localStorage에 백업 저장 (오프라인 대비)
+    let allScores = JSON.parse(safeLocalStorage.getItem('ecoGameScores') || '[]');
+    allScores.push(scoreData);
+    
+    // 최근 1000개만 유지
+    if (allScores.length > 1000) {
+        allScores = allScores.slice(-1000);
+    }
+    
+    safeLocalStorage.setItem('ecoGameScores', JSON.stringify(allScores));
+
+    // D1 DB API 호출 (USE_API가 true일 때만)
+    if (USE_API) {
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/scores`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(scoreData)
+            });
+
+            if (!response.ok) {
+                console.error('Failed to save score to DB:', response.status, await response.text());
+            } else {
+                console.log('Score saved to DB successfully!');
+            }
+        } catch (error) {
+            console.error('Error saving score to API:', error);
+            // 실패해도 localStorage에는 저장되어 있음
+        }
+    }
+
+    return scoreData;
+}
+
+// 지역별 평균 점수 계산 (D1 DB API + localStorage 폴백)
+async function calculateRegionStats() {
+    // API 사용 시 서버에서 가져오기
+    if (USE_API) {
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/scores/regions`);
+            if (response.ok) {
+                const regions = await response.json();
+                
+                // API 응답을 기존 포맷으로 변환
+                const regionStats = {};
+                regions.forEach(region => {
+                    regionStats[region.region_id] = {
+                        regionId: region.region_id,
+                        regionName: region.region_name,
+                        count: region.count,
+                        averageScore: Math.round(region.average_score),
+                        totalScore: Math.round(region.average_score * region.count),
+                        scores: []
+                    };
+                });
+                
+                console.log('Region stats loaded from API');
+                return regionStats;
+            }
+        } catch (error) {
+            console.error('Error fetching region stats from API:', error);
+            // 실패 시 localStorage로 폴백
+        }
+    }
+    
+    // localStorage 사용 (API 미사용 또는 실패 시)
+    const allScores = JSON.parse(safeLocalStorage.getItem('ecoGameScores') || '[]');
+    const regionStats = {};
+
+    allScores.forEach(entry => {
+        if (!regionStats[entry.regionId]) {
+            regionStats[entry.regionId] = {
+                regionId: entry.regionId,
+                regionName: entry.regionName,
+                totalScore: 0,
+                count: 0,
+                scores: []
+            };
+        }
+        regionStats[entry.regionId].totalScore += entry.score;
+        regionStats[entry.regionId].count += 1;
+        regionStats[entry.regionId].scores.push(entry.score);
+    });
+
+    // 평균 계산
+    Object.keys(regionStats).forEach(regionId => {
+        const stat = regionStats[regionId];
+        stat.averageScore = stat.count > 0 ? Math.round(stat.totalScore / stat.count) : 0;
+    });
+
+    console.log('Region stats loaded from localStorage');
+    return regionStats;
+}
+
+// 지역별 랭킹 표시
+async function displayRegionRanking() {
+    const listEl = document.getElementById('regionRankingList');
+    if (!listEl) return;
+
+    const regionStats = await calculateRegionStats();
+    const regions = Object.values(regionStats);
+    
+    if (regions.length === 0) {
+        listEl.innerHTML = '<p>아직 기록이 없습니다.</p>';
+        return;
+    }
+
+    // 평균 점수 순으로 정렬
+    regions.sort((a, b) => b.averageScore - a.averageScore);
+
+    let html = '<table style="width: 100%; text-align: left; border-collapse: collapse;">';
+    html += '<thead><tr><th>순위</th><th>지역</th><th>평균 점수</th><th>플레이 수</th></tr></thead><tbody>';
+    
+    regions.forEach((region, idx) => {
+        const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `${idx + 1}.`;
+        const highlight = region.regionId === state.regionId ? 'style="background: rgba(76, 175, 80, 0.15);"' : '';
+        html += `<tr ${highlight}>
+            <td style="padding: 8px;">${medal}</td>
+            <td style="padding: 8px;">${region.regionName}</td>
+            <td style="padding: 8px; font-weight: 700;">${region.averageScore}점</td>
+            <td style="padding: 8px;">${region.count}회</td>
+        </tr>`;
+    });
+    
+    html += '</tbody></table>';
+    listEl.innerHTML = html;
+}
+
+// 선택한 지역 내 개인 랭킹 표시
+async function displayPersonalRanking() {
+    const listEl = document.getElementById('personalRankingList');
+    const descEl = document.getElementById('personalRankingDesc');
+    const myRankText = document.getElementById('myRankText');
+    
+    if (!listEl) return;
+
+    let regionScores = [];
+    
+    // API 사용 시 서버에서 가져오기
+    if (USE_API) {
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/scores/${state.regionId}`);
+            if (response.ok) {
+                const data = await response.json();
+                regionScores = data.scores.map(s => ({
+                    playerName: s.player_name,
+                    score: s.score,
+                    regionId: s.region_id,
+                    regionName: s.region_name,
+                    timestamp: s.timestamp
+                }));
+                console.log('Personal ranking loaded from API');
+            }
+        } catch (error) {
+            console.error('Error fetching personal ranking from API:', error);
+        }
+    }
+    
+    // localStorage 사용 (API 미사용 또는 실패 시)
+    if (regionScores.length === 0) {
+        const allScores = JSON.parse(safeLocalStorage.getItem('ecoGameScores') || '[]');
+        regionScores = allScores.filter(entry => entry.regionId === state.regionId);
+        console.log('Personal ranking loaded from localStorage');
+    }
+    
+    if (descEl) {
+        descEl.textContent = `${state.regionName} 플레이어 순위`;
+    }
+
+    if (regionScores.length === 0) {
+        listEl.innerHTML = '<p>아직 이 지역의 기록이 없습니다.</p>';
+        if (myRankText) myRankText.textContent = '';
+        return;
+    }
+
+    // 점수 순으로 정렬
+    regionScores.sort((a, b) => b.score - a.score);
+
+    // 상위 20명만 표시
+    const topScores = regionScores.slice(0, 20);
+    
+    let html = '<table style="width: 100%; text-align: left; border-collapse: collapse;">';
+    html += '<thead><tr><th>순위</th><th>이름</th><th>점수</th><th>날짜</th></tr></thead><tbody>';
+    
+    topScores.forEach((entry, idx) => {
+        const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `${idx + 1}.`;
+        const isMe = entry.playerName === state.playerName && entry.score === state.score;
+        const highlight = isMe ? 'style="background: rgba(76, 175, 80, 0.2); font-weight: 700;"' : '';
+        const date = new Date(entry.timestamp).toLocaleDateString();
+        
+        html += `<tr ${highlight}>
+            <td style="padding: 8px;">${medal}</td>
+            <td style="padding: 8px;">${entry.playerName}</td>
+            <td style="padding: 8px; font-weight: 700;">${entry.score}점</td>
+            <td style="padding: 8px;">${date}</td>
+        </tr>`;
+    });
+    
+    html += '</tbody></table>';
+    listEl.innerHTML = html;
+
+    // 내 순위 표시
+    if (state.playerName && myRankText) {
+        const myRank = regionScores.findIndex(entry => 
+            entry.playerName === state.playerName && entry.score === state.score
+        ) + 1;
+        
+        if (myRank > 0) {
+            myRankText.textContent = `${state.regionName}에서 당신의 순위: ${myRank}위 / ${regionScores.length}명`;
+            myRankText.style.display = 'block';
+        } else {
+            myRankText.style.display = 'none';
+        }
+    }
+}
+
+// 통계 그래프 표시
+function displayStatsChart() {
+    const canvas = document.getElementById('statsChart');
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    const regionStats = calculateRegionStats();
+    const regions = Object.values(regionStats);
+
+    if (regions.length === 0) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = '#fff';
+        ctx.font = '14px Noto Sans KR';
+        ctx.textAlign = 'center';
+        ctx.fillText('아직 데이터가 없습니다.', canvas.width / 2, canvas.height / 2);
+        return;
+    }
+
+    // Chart.js 사용
+    if (typeof Chart !== 'undefined') {
+        // 기존 차트 제거
+        if (window.statsChartInstance) {
+            window.statsChartInstance.destroy();
+        }
+
+        const labels = regions.map(r => r.regionName);
+        const data = regions.map(r => r.averageScore);
+        const counts = regions.map(r => r.count);
+
+        window.statsChartInstance = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: '평균 점수',
+                    data: data,
+                    backgroundColor: 'rgba(76, 175, 80, 0.6)',
+                    borderColor: 'rgba(76, 175, 80, 1)',
+                    borderWidth: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: { color: '#fff' },
+                        grid: { color: 'rgba(255, 255, 255, 0.1)' }
+                    },
+                    x: {
+                        ticks: { color: '#fff' },
+                        grid: { color: 'rgba(255, 255, 255, 0.1)' }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        labels: { color: '#fff' }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            afterLabel: function(context) {
+                                const idx = context.dataIndex;
+                                return `플레이 수: ${counts[idx]}회`;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
 }
 
 // 오답노트 화면 표시
@@ -1955,6 +2304,58 @@ function setupKeyboardControls() {
     }
 }
 
+// 터치 스와이프 입력 (모바일)
+function setupTouchControls() {
+    let touchStartX = 0;
+    let touchStartY = 0;
+    let touchStartTime = 0;
+    
+    const canvas = state.renderer?.domElement;
+    if (!canvas) return;
+
+    // 터치 시작
+    canvas.addEventListener('touchstart', (e) => {
+        if (!state.isPlaying) return;
+        
+        const touch = e.touches[0];
+        touchStartX = touch.clientX;
+        touchStartY = touch.clientY;
+        touchStartTime = Date.now();
+    }, { passive: true });
+
+    // 터치 종료 (스와이프 감지)
+    canvas.addEventListener('touchend', (e) => {
+        if (!state.isPlaying) return;
+        
+        const touch = e.changedTouches[0];
+        const touchEndX = touch.clientX;
+        const touchEndY = touch.clientY;
+        const touchEndTime = Date.now();
+        
+        const deltaX = touchEndX - touchStartX;
+        const deltaY = touchEndY - touchStartY;
+        const deltaTime = touchEndTime - touchStartTime;
+        
+        // 스와이프 최소 거리와 최대 시간 설정
+        const minSwipeDistance = 50; // 50px 이상 움직여야 스와이프로 인식
+        const maxSwipeTime = 500; // 0.5초 이내
+        
+        // 좌우 스와이프만 감지 (세로 움직임보다 가로 움직임이 더 커야 함)
+        if (Math.abs(deltaX) > Math.abs(deltaY) && 
+            Math.abs(deltaX) > minSwipeDistance && 
+            deltaTime < maxSwipeTime) {
+            
+            if (deltaX > 0) {
+                // 오른쪽 스와이프 → 오른쪽 레인으로
+                state.playerLane = Math.max(0, state.playerLane - 1);
+            } else {
+                // 왼쪽 스와이프 → 왼쪽 레인으로
+                state.playerLane = Math.min(2, state.playerLane + 1);
+            }
+        }
+    }, { passive: true });
+}
+
 // 달리기 애니메이션
 function animateRunning(player) {
     if (!player.userData) return;
@@ -2006,13 +2407,21 @@ function animateRunning(player) {
 }
 
 // 메인 게임 루프
+let lastHudUpdate = 0;
 function gameLoop() {
     if (!state.isPlaying) return;
     state.animationId = requestAnimationFrame(gameLoop);
 
     // 시간
     state.gameTime += 1 / 60;
-    updateHud();
+    
+    // HUD는 매 프레임이 아닌 0.1초마다만 업데이트 (성능 향상)
+    const now = Date.now();
+    if (now - lastHudUpdate > 100) {
+        updateHud();
+        lastHudUpdate = now;
+    }
+    
     if (state.gameTime >= state.gameTimeLimit) {
         endGame();
         return;
@@ -2029,7 +2438,8 @@ function gameLoop() {
     state.player.position.z += state.gameSpeed;
 
     // 플레이어 위치 기준으로 도로 세그먼트를 재배치해서 무한 도로처럼 보이게 함
-    const baseIndex = Math.floor(state.player.position.z / state.roadLength);
+    const halfSegments = Math.floor(state.roadSegments.length / 2);
+    const baseIndex = Math.floor(state.player.position.z / state.roadLength) - halfSegments;
     state.roadSegments.forEach((seg, i) => {
         const index = baseIndex + i;
         seg.position.z = index * state.roadLength;
@@ -2088,6 +2498,8 @@ function gameLoop() {
                     explanation: localizedExplanation,
                 });
                 showFeedback(t('feedbackWrong'), false);
+                // 오답 말풍선 표시
+                showWrongAnswerBubble(localizedYourAnswer, localizedCorrectAnswer);
             }
 
             set.resolved = true;
@@ -2120,6 +2532,7 @@ async function startGame() {
     // JSON의 모든 문제를 세트로 만들어, 간격을 두고 배치
     createAllProblemSets();
     setupKeyboardControls();
+    setupTouchControls(); // 모바일 터치 지원
 
     state.score = 0;
     state.gameTime = 0;
@@ -2128,6 +2541,7 @@ async function startGame() {
 
     document.getElementById('intro').style.display = 'none';
     document.getElementById('scoreBox').style.display = 'block';
+    document.getElementById('settingsBtn').style.display = 'block'; // 설정 버튼 표시
     // 상단 문제 패널에서 현재/다음 문제 텍스트를 보여준다
     updateQuestionPanelForNextSet();
     updateHud();
@@ -2163,6 +2577,7 @@ function resetGameState() {
     state.environmentObjects = [];
     state.problemSets = [];
     state.incorrectAnswers = [];
+    state.finishLineZ = 0;
     state.playerLane = 1;
     state.isPlaying = false;
     state.gameTime = 0;
@@ -2178,6 +2593,13 @@ function handleResize() {
 
 // DOM 준비 후
 document.addEventListener('DOMContentLoaded', () => {
+    // 카카오 SDK 초기화
+    if (window.Kakao && !Kakao.isInitialized()) {
+        // TODO: 실제 카카오 JavaScript 키로 변경 필요
+        Kakao.init('YOUR_KAKAO_JAVASCRIPT_KEY');
+        console.log('Kakao SDK initialized:', Kakao.isInitialized());
+    }
+
     // 초기 언어를 UI에 반영
     applyLanguageToUI();
 
@@ -2188,6 +2610,49 @@ document.addEventListener('DOMContentLoaded', () => {
         languageSelect.addEventListener('change', (e) => {
             state.language = e.target.value;
             applyLanguageToUI();
+        });
+    }
+
+    // 인트로 영상 → 프리게임 화면 전환
+    const introVideo = document.getElementById('introVideo');
+    const introVideoScreen = document.getElementById('introVideoScreen');
+    const introScreen = document.getElementById('intro');
+
+    let introScreenShown = false;
+
+    function showIntroScreen() {
+        if (introScreenShown) return;
+        introScreenShown = true;
+        if (introVideoScreen) introVideoScreen.style.display = 'none';
+        if (introScreen) introScreen.style.display = 'flex';
+    }
+
+    if (introVideo) {
+        introVideo.addEventListener('ended', showIntroScreen);
+        introVideo.addEventListener('error', showIntroScreen);
+    } else {
+        // 영상이 없거나 로딩 실패 시 바로 인트로 화면 표시
+        showIntroScreen();
+    }
+
+    if (introVideoScreen) {
+        introVideoScreen.addEventListener('click', showIntroScreen);
+        setTimeout(showIntroScreen, 15000);
+    }
+
+    // 로그인 없이 게임 시작 버튼
+    const startGameBtn = document.getElementById('startGameBtn');
+    if (startGameBtn) {
+        startGameBtn.addEventListener('click', () => {
+            if (introScreen) {
+                introScreen.classList.add('fade-out');
+            }
+            setTimeout(() => {
+                if (introScreen) {
+                    introScreen.style.display = 'none';
+                }
+                startGame();
+            }, 700);
         });
     }
 
@@ -2306,13 +2771,155 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // 인게임 설정 버튼
+    const settingsBtn = document.getElementById('settingsBtn');
+    const settingsModal = document.getElementById('settingsModal');
+    const quitGameBtn = document.getElementById('quitGameBtn');
+    const resumeGameBtn = document.getElementById('resumeGameBtn');
+    const quitConfirmModal = document.getElementById('quitConfirmModal');
+    const quitConfirmBtn = document.getElementById('quitConfirmBtn');
+    const quitCancelBtn = document.getElementById('quitCancelBtn');
+
+    if (settingsBtn && settingsModal) {
+        // 설정 버튼 클릭 → 모달 열기
+        settingsBtn.addEventListener('click', () => {
+            state.isPlaying = false; // 게임 일시정지
+            settingsModal.classList.remove('hidden');
+        });
+
+        // 게임 종료 버튼 → 확인 모달 표시
+        if (quitGameBtn && quitConfirmModal) {
+            quitGameBtn.addEventListener('click', () => {
+                settingsModal.classList.add('hidden');
+                quitConfirmModal.classList.remove('hidden');
+            });
+        }
+
+        // 게임 종료 확인 → 인트로로 이동
+        if (quitConfirmBtn) {
+            quitConfirmBtn.addEventListener('click', () => {
+                quitConfirmModal.classList.add('hidden');
+                
+                // 게임 상태 정리
+                if (state.animationId) {
+                    cancelAnimationFrame(state.animationId);
+                    state.animationId = null;
+                }
+                state.isPlaying = false;
+                
+                // 모든 HUD 숨기기
+                document.getElementById('scoreBox').style.display = 'none';
+                document.getElementById('timerBox').style.display = 'none';
+                document.getElementById('questionPanel').style.display = 'none';
+                document.getElementById('tierBadgeHud').style.display = 'none';
+                document.getElementById('settingsBtn').style.display = 'none';
+                document.getElementById('feedbackMessage').style.display = 'none';
+                
+                // 엔딩 화면 숨기기
+                const ending = document.getElementById('ending');
+                if (ending) ending.style.display = 'none';
+                
+                // 인트로 화면 표시
+                const intro = document.getElementById('intro');
+                if (intro) {
+                    intro.style.display = 'flex';
+                    intro.classList.remove('fade-out');
+                }
+                
+                // Three.js 씬 정리
+                resetGameState();
+            });
+        }
+
+        // 게임 종료 취소 → 설정 모달로 돌아가기
+        if (quitCancelBtn) {
+            quitCancelBtn.addEventListener('click', () => {
+                quitConfirmModal.classList.add('hidden');
+                settingsModal.classList.remove('hidden');
+            });
+        }
+
+        // 계속하기 버튼 → 모달 닫고 게임 재개
+        if (resumeGameBtn) {
+            resumeGameBtn.addEventListener('click', () => {
+                settingsModal.classList.add('hidden');
+                state.isPlaying = true;
+                gameLoop(); // 게임 루프 재개
+            });
+        }
+
+        // 모달 배경 클릭 시 계속하기
+        settingsModal.addEventListener('click', (e) => {
+            if (e.target === settingsModal) {
+                settingsModal.classList.add('hidden');
+                state.isPlaying = true;
+                gameLoop();
+            }
+        });
+
+        // 확인 모달 배경 클릭 시 취소 (설정으로 돌아가기)
+        if (quitConfirmModal) {
+            quitConfirmModal.addEventListener('click', (e) => {
+                if (e.target === quitConfirmModal) {
+                    quitConfirmModal.classList.add('hidden');
+                    settingsModal.classList.remove('hidden');
+                }
+            });
+        }
+    }
+
     const restartBtn = document.getElementById('restartBtn');
     if (restartBtn) {
         restartBtn.addEventListener('click', () => {
             // 요구사항: 인트로로 가지 않고 바로 게임 플레이 화면으로 재시작
             const ending = document.getElementById('ending');
             if (ending) ending.style.display = 'none';
+            
+            // 인트로 화면과 인트로 비디오 완전히 숨기기
+            const intro = document.getElementById('intro');
+            if (intro) intro.style.display = 'none';
+            
+            const introVideoScreen = document.getElementById('introVideoScreen');
+            if (introVideoScreen) {
+                introVideoScreen.style.display = 'none';
+                const video = document.getElementById('introVideo');
+                if (video) {
+                    video.pause();
+                    video.currentTime = 0;
+                }
+            }
+            
             startGame();
+        });
+    }
+
+    // 점수 저장 버튼
+    const submitScoreBtn = document.getElementById('submitScoreBtn');
+    if (submitScoreBtn) {
+        submitScoreBtn.addEventListener('click', async () => {
+            const nameInput = document.getElementById('endingPlayerName');
+            const playerName = nameInput ? nameInput.value.trim() : '';
+            
+            if (!playerName) {
+                alert('이름을 입력해주세요!');
+                return;
+            }
+            
+            // 점수 저장
+            state.playerName = playerName;
+            await saveScore(playerName, state.score, state.regionId, state.regionName);
+            
+            // 버튼들 활성화
+            const reviewBtn = document.getElementById('reviewBtn');
+            const rankingBtn = document.getElementById('rankingBtn');
+            if (reviewBtn) reviewBtn.disabled = false;
+            if (rankingBtn) rankingBtn.disabled = false;
+            
+            // 이름 입력 섹션 숨기기
+            const nameSection = document.getElementById('nameInputSection');
+            if (nameSection) nameSection.style.display = 'none';
+            
+            alert('점수가 저장되었습니다!');
         });
     }
 
@@ -2331,46 +2938,83 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!ranking || !ending) return;
 
             ending.style.display = 'none';
-
-            // 더미 랭킹(1~3위) + 현재 플레이어 랭킹 계산
-            const dummyRankings = [
-                { name: 'GreenHero', score: 480 },
-                { name: 'RecycleMaster', score: 420 },
-                { name: 'EcoRunner', score: 380 },
-            ];
-
-            const playerEntry = {
-                name: state.playerName || 'You',
-                score: state.score,
-            };
-
-            const combined = [...dummyRankings, playerEntry];
-            combined.sort((a, b) => b.score - a.score);
-
-            const rankingList = document.getElementById('rankingList');
-            const myRankText = document.getElementById('myRankText');
-            if (rankingList) {
-                let html = '<table style="width: 100%; text-align: left; border-collapse: collapse;">';
-                html += '<thead><tr><th>순위</th><th>이름</th><th>점수</th></tr></thead><tbody>';
-                combined.forEach((r, idx) => {
-                    if (idx > 2 && r !== playerEntry) return; // 상위 3위 + 플레이어만 표시
-                    const displayRank = idx + 1;
-                    html += `<tr><td style="padding: 8px;">${displayRank}</td><td style="padding: 8px;">${r.name}</td><td style="padding: 8px;">${r.score}점</td></tr>`;
-                });
-                html += '</tbody></table>';
-                rankingList.innerHTML = html;
-            }
-
-            if (myRankText) {
-                const myIndex = combined.findIndex(
-                    (r) => r.name === playerEntry.name && r.score === playerEntry.score
-                );
-                const myRank = myIndex >= 0 ? myIndex + 1 : '랜덤';
-                myRankText.textContent = `나의 랭킹: ${myRank}등`;
-            }
+            
+            // 지역별 랭킹 표시 (기본 탭)
+            displayRegionRanking();
+            displayPersonalRanking();
+            displayStatsChart();
+            
+            // 첫 번째 탭 활성화
+            const tabs = ranking.querySelectorAll('.tab-btn');
+            const contents = ranking.querySelectorAll('.tab-content');
+            tabs.forEach(t => t.classList.remove('active'));
+            contents.forEach(c => c.classList.remove('active'));
+            
+            const regionTab = document.getElementById('regionTabBtn');
+            const regionContent = document.getElementById('regionRanking');
+            if (regionTab) regionTab.classList.add('active');
+            if (regionContent) regionContent.classList.add('active');
 
             ranking.style.display = 'flex';
         });
+    }
+    
+    // 랭킹 탭 전환
+    const regionTabBtn = document.getElementById('regionTabBtn');
+    const personalTabBtn = document.getElementById('personalTabBtn');
+    const statsTabBtn = document.getElementById('statsTabBtn');
+    
+    if (regionTabBtn) {
+        regionTabBtn.addEventListener('click', () => {
+            switchTab('region');
+        });
+    }
+    
+    if (personalTabBtn) {
+        personalTabBtn.addEventListener('click', () => {
+            switchTab('personal');
+        });
+    }
+    
+    if (statsTabBtn) {
+        statsTabBtn.addEventListener('click', () => {
+            switchTab('stats');
+        });
+    }
+    
+    function switchTab(tabName) {
+        const tabs = document.querySelectorAll('.tab-btn');
+        const contents = document.querySelectorAll('.tab-content');
+        
+        tabs.forEach(tab => {
+            if (tab.dataset.tab === tabName) {
+                tab.classList.add('active');
+            } else {
+                tab.classList.remove('active');
+            }
+        });
+        
+        // 모든 탭 컨텐츠 숨기기
+        contents.forEach(content => {
+            content.classList.remove('active');
+        });
+        
+        // 선택한 탭만 표시
+        let targetContent = null;
+        if (tabName === 'region') {
+            targetContent = document.getElementById('regionRanking');
+            displayRegionRanking();
+        } else if (tabName === 'personal') {
+            targetContent = document.getElementById('personalRanking');
+            displayPersonalRanking();
+        } else if (tabName === 'stats') {
+            targetContent = document.getElementById('statsView');
+            displayStatsChart();
+        }
+        
+        if (targetContent) {
+            targetContent.classList.add('active');
+        }
     }
 
     const reviewRestartBtn = document.getElementById('reviewRestartBtn');
@@ -2378,6 +3022,21 @@ document.addEventListener('DOMContentLoaded', () => {
         reviewRestartBtn.addEventListener('click', () => {
             const review = document.getElementById('review');
             if (review) review.style.display = 'none';
+            
+            // 인트로 화면과 인트로 비디오 완전히 숨기기
+            const intro = document.getElementById('intro');
+            if (intro) intro.style.display = 'none';
+            
+            const introVideoScreen = document.getElementById('introVideoScreen');
+            if (introVideoScreen) {
+                introVideoScreen.style.display = 'none';
+                const video = document.getElementById('introVideo');
+                if (video) {
+                    video.pause();
+                    video.currentTime = 0;
+                }
+            }
+            
             startGame();
         });
     }
@@ -2387,6 +3046,94 @@ document.addEventListener('DOMContentLoaded', () => {
         reviewBackBtn.addEventListener('click', () => {
             const review = document.getElementById('review');
             if (review) review.style.display = 'none';
+        });
+    }
+
+    // 카카오톡 공유 버튼
+    const kakaoShareBtn = document.getElementById('kakaoShareBtn');
+    if (kakaoShareBtn) {
+        kakaoShareBtn.addEventListener('click', () => {
+            if (!window.Kakao || !Kakao.isInitialized()) {
+                alert(state.language === 'ko' 
+                    ? '카카오톡 공유 기능을 사용할 수 없습니다.\n관리자에게 문의하세요.' 
+                    : 'Kakao share is not available.\nPlease contact admin.');
+                return;
+            }
+
+            const tierInfo = getTierInfo(state.score);
+            const shareUrl = window.location.href.split('?')[0];
+            
+            // 디버깅: 공유할 URL 확인
+            console.log('💬 카카오톡 공유 링크:', shareUrl);
+            console.log('📊 점수:', state.score, '| 지역:', state.regionName, '| 티어:', tierInfo.current.name);
+            
+            Kakao.Share.sendDefault({
+                objectType: 'feed',
+                content: {
+                    title: 'EcoChaser - 친환경 분리수거 게임 🌍',
+                    description: state.language === 'ko'
+                        ? `점수: ${state.score}점 | 지역: ${state.regionName} | 티어: ${tierInfo.current.name}\n친환경 분리수거 게임에 도전해보세요!`
+                        : `Score: ${state.score} pts | Region: ${state.regionName} | Tier: ${tierInfo.current.name}\nChallenge yourself!`,
+                    imageUrl: 'https://your-domain.com/preview.jpg', // TODO: 실제 이미지 URL로 변경
+                    link: {
+                        mobileWebUrl: shareUrl,
+                        webUrl: shareUrl,
+                    },
+                },
+                buttons: [
+                    {
+                        title: state.language === 'ko' ? '게임 하러 가기' : 'Play Game',
+                        link: {
+                            mobileWebUrl: shareUrl,
+                            webUrl: shareUrl,
+                        },
+                    },
+                ],
+            });
+        });
+    }
+
+    // 일반 공유하기 버튼
+    const shareRankingBtn = document.getElementById('shareRankingBtn');
+    if (shareRankingBtn) {
+        shareRankingBtn.addEventListener('click', async () => {
+            const tierInfo = getTierInfo(state.score);
+            const shareText = state.language === 'ko'
+                ? `🌍 EcoChaser 게임 결과\n` +
+                  `📊 점수: ${state.score}점\n` +
+                  `📍 지역: ${state.regionName}\n` +
+                  `🏆 티어: ${tierInfo.current.name}\n\n` +
+                  `친환경 분리수거 게임에 도전해보세요!`
+                : `🌍 EcoChaser Game Result\n` +
+                  `📊 Score: ${state.score} pts\n` +
+                  `📍 Region: ${state.regionName}\n` +
+                  `🏆 Tier: ${tierInfo.current.name}\n\n` +
+                  `Challenge yourself in eco-friendly waste sorting!`;
+            
+            const shareUrl = window.location.href.split('?')[0];
+            
+            // 디버깅: 공유할 URL 확인
+            console.log('📤 공유할 링크:', shareUrl);
+            console.log('📝 공유할 텍스트:', shareText);
+            
+            // 모바일: Web Share API 사용
+            if (navigator.share) {
+                try {
+                    await navigator.share({
+                        title: 'EcoChaser Game Result',
+                        text: shareText,
+                        url: shareUrl
+                    });
+                } catch (err) {
+                    if (err.name !== 'AbortError') {
+                        console.log('Share failed:', err);
+                        copyToClipboard(shareText + '\n' + shareUrl);
+                    }
+                }
+            } else {
+                // PC: 클립보드에 복사
+                copyToClipboard(shareText + '\n' + shareUrl);
+            }
         });
     }
 
