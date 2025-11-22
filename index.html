@@ -6,54 +6,74 @@
   <title>EcoChaser</title>
   <link rel="stylesheet" href="css/style.css"/>
   <style>
-    /* 기본은 홈 모드: 히어로만 표시 */
+    /* 필요 시 기존 모드 스타일은 지금은 사용하지 않아도 됨 */
     body.mode-home .hero { display: block; padding-top: 110px;}
     body.mode-home #ranking { display: none; }
 
-    /* 랭킹 모드: 랭킹만 표시 (두 번째 스샷처럼) */
     body.mode-ranking .hero { display: none; }
     body.mode-ranking #ranking {
         display: block;
         padding-top: 64px;
         padding-bottom: 80px;
-        min-height: calc(100vh - 160px); /* 헤더/푸터 제외하고 꽉 차게 */
+        min-height: calc(100vh - 160px);
     }
     body.mode-ranking .leaderboard { margin-top: 24px; }
+    .cta-buttons {
+    display: flex;
+    gap: 12px;
+    flex-wrap: nowrap;          /* 줄바꿈 안 되도록 */
+    align-items: center;
+    margin-top: 24px;
+  }
+
+  .cta-buttons .btn {
+    white-space: nowrap;        /* 버튼 글자가 한 줄에 유지되도록 */
+  }
+
+  .btn-secondary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 10px 20px;
+    border-radius: 999px;
+    border: 1px solid rgba(0,0,0,0.06);
+    background: #f4fbf7;
+    color: #1b5e20;
+    font-weight: 500;
+    font-size: 0.95rem;
+  }
+
+  .btn-secondary:hover {
+    background: #e2f5eb;
+  }
   </style>
 </head>
 <body>
-    <nav class="navbar">
-        <div class="navbar-container">
-            <a href="index.html" class="logo-link">
-                <img src="image/Logo.png" alt="TrashHunter Logo" class="logo-img">
-            </a>
-            <ul class="nav-menu">
-                <li><a href="ranking.html">경쟁 순위</a></li>
-            </ul>
-        <div class="auth-menu">
-            <div id="logged-out-menu">
-                <a href="signup.html" class="btn-signup">회원가입</a>
-                <a href="login.html" class="btn-login">로그인</a>
-        </div>
-
-        <div id="logged-in-menu" style="display: none; align-items: center;">
-            <span id="user-nickname-display" style="margin-right: 15px; font-weight: 600; color: var(--dark);"></span>
-        
-            <a href="#" id="logout-button" class="btn-login" style="border-color: var(--accent); color: var(--accent);">로그아웃</a>
-        </div>
+  <!-- 헤더: 로고 + 지금 플레이하기 버튼 -->
+  <nav class="navbar">
+    <div class="navbar-container">
+      <a href="index.html" class="logo-link">
+        <img src="image/Logo.png" alt="EcoChaser Logo" class="logo-img">
+      </a>
+      <div class="nav-actions">
+        <a href="game/ecochaserGame/index.html" class="btn btn-primary">지금 플레이하기</a>
+      </div>
     </div>
-    </nav>
+  </nav>
 
   <main class="main-content">
+    <!-- 1. 히어로 / 게임 소개 요약 -->
     <section class="hero">
       <div class="hero-grid">
         <div class="hero-left">
           <div class="hero-content">
             <h1>Eco Chaser</h1>
             <p>쓰레기를 분리수거하며 환경을 지키는 
-                <br>실시간 참여형 게임</p>
+              <br>실시간 참여형 게임</p>
             <div class="cta-buttons">
               <a href="game/ecochaserGame/index.html" class="btn btn-primary">지금 플레이하기</a>
+              <a href="#ranking-section" class="btn btn-secondary">랭킹 보기</a>
+              <a href="#region-stats-section" class="btn btn-secondary">지역별 통계 보기</a>
             </div>
           </div>
         </div>
@@ -92,9 +112,11 @@
               </article>
             </div>
           </div>
-          </div>
+        </div>
       </div>
     </section>
+
+    <!-- 2. 게임 소개 상세 -->
     <section class="game-intro" id="game-intro">
       <div class="intro-header">
         <div class="intro-header-left">
@@ -138,35 +160,80 @@
       </div>
     </section>
 
-    <footer class="site-footer">
-    
-        <div class="footer-content">
-            <div class="footer-section">
-                <img src="image/Logo.png" alt="TrashHunter Logo" class="logo-img">
-            </div>
-            <div class="footer-section">
-                <h4>메뉴</h4>
-                <ul>
-                    <li><a href="ranking.html">경쟁 순위</a></li>
-                    <li><a href="login.html">로그인</a></li>
-                    <li><a href="signup.html">회원가입</a></li>
-                </ul>
-            </div>
-            <div class="footer-section">
-                <h4>연락처</h4>
-                <p>이메일: EcoChaser@jeiu.com</p>
-                <div class="social-links">
-                    <a href="#" class="social-icon">📱</a>
-                    <a href="#" class="social-icon">📘</a>
-                    <a href="#" class="social-icon">📸</a>
-                </div>
-            </div>
-        </div>
-        <div class="footer-bottom">
-            <p>&copy; 2025 Eco Chaser. All rights reserved.</p>
-        </div>
-    </footer>
+    <!-- 3. 통합 랭킹 섹션 -->
+    <section id="ranking-section" class="leaderboard">
+      <h2>통합 랭킹</h2>
+      <div class="leaderboard-list">
+        <div class="loading">랭킹을 불러오는 중...</div>
+      </div>
+    </section>
 
-    <script src="js/script.js"></script>
+    <!-- 4. 지역별 통계 섹션 -->
+    <section id="region-stats-section" class="stats-section">
+      <h2>지역별 통계</h2>
+
+      <div class="stats-controls">
+        <label for="regionSelect">지역 선택</label>
+        <select id="regionSelect">
+          <option value="all">전체</option>
+          <option value="kr_seoul">서울특별시</option>
+          <option value="kr_busan">부산광역시</option>
+          <option value="kr_incheon">인천광역시</option>
+          <option value="kr_cheonan">천안시</option>
+        </select>
+      </div>
+
+      <div id="regionStatsSummary" class="stats-summary">
+        <p>지역을 선택하면 플레이 횟수, 평균 점수, 최고 점수 등의 통계가 여기에 표시됩니다.</p>
+      </div>
+
+      <table class="stats-table">
+        <thead>
+          <tr>
+            <th>지역</th>
+            <th>플레이 횟수</th>
+            <th>평균 점수</th>
+            <th>최고 점수</th>
+            <th>최저 점수</th>
+          </tr>
+        </thead>
+        <tbody id="regionStatsTableBody">
+          <tr>
+            <td colspan="5" style="text-align:center;">데이터를 불러오는 중...</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+  </main>
+
+  <!-- 푸터 -->
+  <footer class="site-footer">
+    <div class="footer-content">
+      <div class="footer-section">
+        <img src="image/Logo.png" alt="TrashHunter Logo" class="logo-img">
+      </div>
+      <div class="footer-section">
+        <h4>메뉴</h4>
+        <ul>
+          <li><a href="#ranking-section">랭킹</a></li>
+          <li><a href="#region-stats-section">지역별 통계</a></li>
+        </ul>
+      </div>
+      <div class="footer-section">
+        <h4>연락처</h4>
+        <p>이메일: EcoChaser@jeiu.com</p>
+        <div class="social-links">
+          <a href="#" class="social-icon">📱</a>
+          <a href="#" class="social-icon">📘</a>
+          <a href="#" class="social-icon">📸</a>
+        </div>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <p>&copy; 2025 Eco Chaser. All rights reserved.</p>
+    </div>
+  </footer>
+
+  <script src="js/script.js"></script>
 </body>
 </html>

@@ -3,101 +3,13 @@
  * Eco Chaser 프로젝트 공통 스크립트
  */
 
-// [1] 회원가입 폼 처리 (signup.html용)
-const signupForm = document.getElementById('signup-form');
-
-if (signupForm) {
-    const signupMessage = document.getElementById('signup-message');
-
-    signupForm.addEventListener('submit', async (event) => {
-        event.preventDefault(); 
-
-        const username = document.getElementById('signup-username').value;
-        const password = document.getElementById('signup-password').value;
-        const nickname = document.getElementById('signup-nickname').value;
-
-        try {
-            // ★ Cloudflare Workers용 경로로 변경: /api/users
-            const response = await fetch('/api/users', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username, password, nickname }),
-            });
-
-            const data = await response.json(); 
-
-            if (data.success) {
-                signupMessage.textContent = data.message + " (3초 후 로그인 페이지로 이동)";
-                signupMessage.style.color = 'var(--info)';
-                setTimeout(() => {
-                    window.location.href = 'login.html'; 
-                }, 3000);
-            } else {
-                signupMessage.textContent = data.message;
-                signupMessage.style.color = 'var(--accent)';
-            }
-        } catch (error) {
-            console.error('회원가입 요청 실패:', error);
-            signupMessage.textContent = '서버 통신에 실패했습니다.';
-            signupMessage.style.color = 'var(--accent)';
-        }
-    });
-} // [회원가입 폼 처리 끝]
-
-// [2] 로그인 폼 처리 (login.html용)
-const loginForm = document.getElementById('login-form');
-
-if (loginForm) {
-    const loginMessage = document.getElementById('login-message');
-
-    loginForm.addEventListener('submit', async (event) => {
-        event.preventDefault();
-
-        const username = document.getElementById('login-username').value;
-        const password = document.getElementById('login-password').value;
-
-        try {
-            // ★ Cloudflare Workers용 경로로 변경: /api/login
-            const response = await fetch('/api/login', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username, password }),
-            });
-
-            const data = await response.json();
-
-            if (data.success) {
-                loginMessage.textContent = `${data.nickname}님, ${data.message}`; 
-                loginMessage.style.color = 'blue';
-                
-                // 로그인 성공 시 닉네임과 ID를 localStorage에 저장
-                localStorage.setItem('userNickname', data.nickname);
-                localStorage.setItem('userId', data.userId);
-                
-                // 2초 후 메인 페이지(index.html)로 이동
-                setTimeout(() => { 
-                    window.location.href = 'index.html'; 
-                }, 2000);
-            } else {
-                loginMessage.textContent = data.message;
-                loginMessage.style.color = 'red';
-            }
-        } catch (error) {
-            console.error('로그인 요청 실패:', error);
-            loginMessage.textContent = '서버 통신에 실패했습니다.';
-            loginMessage.style.color = 'red';
-        }
-    });
-} // [로그인 폼 처리 끝]
-
-
 // [3] 랭킹 조회 및 표시 (index.html의 #ranking 모드용)
 /**
  * [랭킹 데이터를 불러와서 화면에 표시하는 함수]
  * 이 함수는 [4]번의 applyModeFromHash에 의해 호출됩니다.
  */
 async function loadRanking() {
-    // (수정!) 랭킹을 표시할 곳이 '.leaderboard-list'가 맞는지 확인
+    // 랭킹을 표시할 곳이 '.leaderboard-list'가 맞는지 확인
     const leaderboardList = document.querySelector('.leaderboard-list');
     
     // 랭킹 리스트 div가 없으면 함수 종료
@@ -232,39 +144,7 @@ function applyModeFromHash() {
 
 document.addEventListener('DOMContentLoaded', () => {
 
-    // --- (A) 로그인 상태 관리 (모든 페이지 공통) ---
-    const userNickname = localStorage.getItem('userNickname');
-    const userId = localStorage.getItem('userId');
-    const loggedOutMenu = document.getElementById('logged-out-menu');
-    const loggedInMenu = document.getElementById('logged-in-menu');
-    
-    if (userNickname && userId) {
-        // 1. 로그인 상태일 때
-        const nicknameDisplay = document.getElementById('user-nickname-display');
-        if (nicknameDisplay) {
-            nicknameDisplay.textContent = `${userNickname}님`;
-        }
-        if (loggedOutMenu) loggedOutMenu.style.display = 'none';
-        if (loggedInMenu) loggedInMenu.style.display = 'flex';
-    } else {
-        // 2. 로그아웃 상태일 때
-        if (loggedOutMenu) loggedOutMenu.style.display = 'flex';
-        if (loggedInMenu) loggedInMenu.style.display = 'none';
-    }
-
-    // --- (B) 로그아웃 버튼 이벤트 (모든 페이지 공통) ---
-    const logoutButton = document.getElementById('logout-button');
-    if (logoutButton) {
-        logoutButton.addEventListener('click', (event) => {
-            event.preventDefault(); 
-            localStorage.removeItem('userNickname');
-            localStorage.removeItem('userId');
-            alert('로그아웃 되었습니다.');
-            window.location.href = 'index.html'; 
-        });
-    }
-
-    // --- (C) 페이지별 초기화 로직 (★여기가 중요★) ---
+    // --- (C) 페이지별 초기화 로직 ---
     
     // 1. index.html인지 확인
     const isIndexPage = document.body.classList.contains('mode-home') || 
@@ -278,14 +158,12 @@ document.addEventListener('DOMContentLoaded', () => {
         applyModeFromHash();
     } else if (leaderboardList) {
         // index.html이 아닌데 랭킹 리스트가 있다면? 
-        // -> ranking.html 이므로 랭킹을 즉시 로드!
+        // -> ranking.html 이므로 랭킹을 즉시 로드! (지금은 거의 사용 안 함)
         loadRanking();
     }
-
     
 }); // [공통 초기화 작업 끝]
 
 
-// [6] (수정 없음) 해시 변경 이벤트 감지
-// (이건 index.html에서만 사용됩니다)
+// [6] 해시 변경 이벤트 감지 (index.html에서만 사용)
 window.addEventListener('hashchange', applyModeFromHash);
