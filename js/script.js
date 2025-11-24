@@ -385,6 +385,11 @@ document.addEventListener('DOMContentLoaded', () => {
         // index.html 이면? -> 해시(#) 기반 모드 전환 실행
         applyModeFromHash();
 
+        // 통합 랭킹 섹션이 있다면, 페이지 진입 시 랭킹 데이터를 바로 로드
+        if (leaderboardList) {
+            loadRanking();
+        }
+
         // 지역별 통계 그래프 초기 렌더링 (전체 기준)
         renderRegionCharts('all');
 
