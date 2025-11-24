@@ -104,6 +104,96 @@ window.submitGameResult = async function submitGameResult(userId, score, wrongIt
     }
 };
 
+// ------------------------------
+// 지역별 통계 그래프 (D1 연동)
+// ------------------------------
+let regionStatsFromServer = [];
+
+// D1에서 지역별 평균 점수 가져오기
+async function loadRegionStats() {
+    try {
+        const res = await fetch('/api/scores/regions');
+        const raw = await res.json();
+
+        if (!Array.isArray(raw)) {
+            console.warn('지역 통계 응답 형식이 배열이 아닙니다:', raw);
+            regionStatsFromServer = [];
+            return;
+        }
+
+        // average_score가 높을수록 오답률이 낮다고 가정하고 0~1 범위의 "추정 오답률"로 변환
+        const MAX_SCORE = 1500; // 점수 상한 가정값 (필요하면 조정)
+        regionStatsFromServer = raw.map((row) => {
+            const avg = Number(row.average_score ?? 0);
+            const clamped = Math.max(0, Math.min(avg, MAX_SCORE));
+            const wrongRate = 1 - clamped / MAX_SCORE; // 0~1 (1에 가까울수록 오답률 높음)
+
+            return {
+                id: row.region_id ?? 'unknown',
+                label: row.region_name ?? '기타',
+                count: Number(row.count ?? 0),
+                averageScore: avg,
+                wrongRate,
+            };
+        });
+    } catch (err) {
+        console.error('지역 통계 불러오기 실패:', err);
+        regionStatsFromServer = [];
+    }
+}
+
+// 더미 데이터: 분리배출 항목별 오답률 (아직 D1 스키마가 없어 placeholder 유지)
+const demoWasteTypeStats = {
+    all: [
+        { label: '일반', wrongRate: 0.35 },
+        { label: '플라스틱', wrongRate: 0.48 },
+        { label: '종이', wrongRate: 0.22 },
+        { label: '유리', wrongRate: 0.3 },
+        { label: '음식물', wrongRate: 0.55 },
+    ],
+};
+
+// 선택된 지역 키에 따라 막대 그래프 렌더링
+async function renderRegionCharts(selectedRegionKey = 'all') {
+    const regionBarsContainer = document.querySelector('.stats-chart-bars[data-chart="regions"]');
+    const wasteBarsContainer = document.querySelector('.stats-chart-bars[data-chart="waste-types"]');
+
+    if (!regionBarsContainer || !wasteBarsContainer) return;
+
+    if (regionStatsFromServer.length === 0) {
+        await loadRegionStats();
+    }
+
+    // 1) 왼쪽: 지역별 평균 오답률 (모든 지역 비교)
+    regionBarsContainer.innerHTML = '';
+    (regionStatsFromServer.length ? regionStatsFromServer : []).forEach((region) => {
+        const heightPct = Math.round(region.wrongRate * 100);
+        const bar = document.createElement('div');
+        bar.className = 'stats-bar';
+        bar.innerHTML = `
+            <div class="stats-bar-column" style="height:${heightPct}%;"></div>
+            <div class="stats-bar-value">${heightPct}%</div>
+            <div class="stats-bar-label">${region.label}</div>
+        `;
+        regionBarsContainer.appendChild(bar);
+    });
+
+    // 2) 오른쪽: 분리배출 항목별 오답률 (지금은 데모 데이터)
+    const wasteData = demoWasteTypeStats[selectedRegionKey] || demoWasteTypeStats.all;
+    wasteBarsContainer.innerHTML = '';
+    wasteData.forEach((item) => {
+        const heightPct = Math.round(item.wrongRate * 100);
+        const bar = document.createElement('div');
+        bar.className = 'stats-bar';
+        bar.innerHTML = `
+            <div class="stats-bar-column" style="height:${heightPct}%;"></div>
+            <div class="stats-bar-value">${heightPct}%</div>
+            <div class="stats-bar-label">${item.label}</div>
+        `;
+        wasteBarsContainer.appendChild(bar);
+    });
+}
+
 // Scroll reveal & hero load-in animations
 document.addEventListener('DOMContentLoaded', () => {
     const revealEls = document.querySelectorAll('.reveal');
@@ -289,16 +379,15 @@ document.addEventListener('DOMContentLoaded', () => {
         // index.html 이면? -> 해시(#) 기반 모드 전환 실행
         applyModeFromHash();
 
-        // 지역별 통계 데모 차트 렌더링
+        // 지역별 통계 그래프 초기 렌더링 (전체 기준)
         renderRegionCharts('all');
 
         const regionSelect = document.getElementById('regionSelect');
         if (regionSelect) {
             regionSelect.addEventListener('change', async () => {
                 const selectedRegion = regionSelect.value || 'all';
-                const response = await fetch(`/api/scores/regions?region=${selectedRegion}`);
-                const data = await response.json();
-                renderRegionCharts(selectedRegion, data);
+                // 선택 값에 맞춰 그래프만 다시 그림 (API 호출은 내부 loadRegionStats에서 수행)
+                renderRegionCharts(selectedRegion);
             });
         }
     } else if (leaderboardList) {
