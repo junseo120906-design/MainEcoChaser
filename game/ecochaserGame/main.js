@@ -2171,6 +2171,47 @@ async function displayPersonalRanking() {
     }
 }
 
+// 전체 사용자 글로벌 랭킹 표시 (D1 /api/ranking 사용)
+async function displayGlobalRanking() {
+    const listEl = document.getElementById('globalRankingList');
+    if (!listEl) return; // 해당 영역이 없으면 아무 것도 하지 않음
+
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/ranking`);
+        const data = await response.json();
+
+        if (!data || data.success === false || !Array.isArray(data.ranking)) {
+            listEl.innerHTML = '<p>랭킹 데이터를 불러오지 못했습니다.</p>';
+            return;
+        }
+
+        const ranking = data.ranking;
+        if (ranking.length === 0) {
+            listEl.innerHTML = '<p>아직 랭킹 데이터가 없습니다.</p>';
+            return;
+        }
+
+        let html = '<table style="width: 100%; text-align: left; border-collapse: collapse;">';
+        html += '<thead><tr><th>순위</th><th>닉네임</th><th>점수</th><th>지역</th></tr></thead><tbody>';
+
+        ranking.forEach((row, idx) => {
+            const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `${idx + 1}.`;
+            html += `<tr>
+                <td style="padding: 8px;">${medal}</td>
+                <td style="padding: 8px;">${row.nickname ?? ''}</td>
+                <td style="padding: 8px; font-weight: 700;">${row.score ?? 0}점</td>
+                <td style="padding: 8px;">${row.region ?? ''}</td>
+            </tr>`;
+        });
+
+        html += '</tbody></table>';
+        listEl.innerHTML = html;
+    } catch (error) {
+        console.error('글로벌 랭킹 불러오기 실패:', error);
+        listEl.innerHTML = '<p>서버 통신에 실패했습니다.</p>';
+    }
+}
+
 // 통계 그래프 표시
 function displayStatsChart() {
     const canvas = document.getElementById('statsChart');
@@ -2998,19 +3039,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
             ending.style.display = 'none';
             
-            // 지역별 랭킹 표시 (기본 탭)
+            // 랭킹 화면 초기화
             displayRegionRanking();
             displayPersonalRanking();
+            displayGlobalRanking();
             displayStatsChart();
             
-            // 첫 번째 탭 활성화
+            // 첫 번째 탭 활성화 (기본: 지역별 랭킹)
             const tabs = ranking.querySelectorAll('.tab-btn');
             const contents = ranking.querySelectorAll('.tab-content');
             tabs.forEach(t => t.classList.remove('active'));
             contents.forEach(c => c.classList.remove('active'));
             
-            const regionTab = document.getElementById('regionTabBtn');
-            const regionContent = document.getElementById('regionRanking');
+            const regionTab = ranking.querySelector('.tab-btn[data-tab="region"]');
+            const regionContent = ranking.querySelector('.tab-content[data-tab="region"]');
             if (regionTab) regionTab.classList.add('active');
             if (regionContent) regionContent.classList.add('active');
 
