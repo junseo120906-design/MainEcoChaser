@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <title>EcoChaser Admin – D1 통계 조회</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body {
+      font-family: system-ui, -apple-system, 'Segoe UI', 'Malgun Gothic', sans-serif;
+      background: #0f172a;
+      color: #e5e7eb;
+      margin: 0;
+      padding: 24px;
+    }
+    h1 {
+      margin-bottom: 8px;
+    }
+    .subtitle {
+      margin-bottom: 24px;
+      color: #9ca3af;
+      font-size: 0.9rem;
+    }
+    .panel-grid {
+      display: grid;
+      /* 카드 최소 너비를 줄여 데스크톱에서 4개가 한 줄에 들어가도록 조정 */
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    .panel {
+      background: #020617;
+      border-radius: 16px;
+      padding: 16px 18px;
+      border: 1px solid #1f2937;
+      box-shadow: 0 12px 30px rgba(0,0,0,0.5);
+    }
+    .panel h2 {
+      font-size: 1.1rem;
+      margin: 0 0 6px;
+    }
+    .panel p {
+      margin: 0 0 12px;
+      font-size: 0.85rem;
+      color: #9ca3af;
+    }
+    .panel button {
+      padding: 6px 12px;
+      border-radius: 999px;
+      border: none;
+      background: #22c55e;
+      color: #022c22;
+      font-weight: 600;
+      cursor: pointer;
+      font-size: 0.85rem;
+    }
+    .panel button:hover {
+      background: #16a34a;
+    }
+    .inline-input {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      margin-top: 4px;
+    }
+    .inline-input input {
+      flex: 1;
+      padding: 4px 8px;
+      border-radius: 8px;
+      border: 1px solid #4b5563;
+      background: #020617;
+      color: #e5e7eb;
+      font-size: 0.85rem;
+    }
+    #adminOutput {
+      background: #020617;
+      border-radius: 16px;
+      padding: 16px 18px;
+      border: 1px solid #1f2937;
+      box-shadow: 0 12px 30px rgba(0,0,0,0.5);
+      max-height: 480px;
+      overflow: auto;
+      font-size: 0.85rem;
+    }
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      margin-top: 8px;
+      font-size: 0.8rem;
+    }
+    th, td {
+      border: 1px solid #1f2937;
+      padding: 4px 6px;
+      text-align: left;
+      white-space: nowrap;
+    }
+    th {
+      background:#111827;
+    }
+    .badge {
+      display:inline-flex;
+      align-items:center;
+      gap:6px;
+      font-size:0.8rem;
+      color:#a5b4fc;
+    }
+    .badge span {
+      font-size:1rem;
+    }
+    .status {
+      margin-top:4px;
+      color:#a5b4fc;
+      font-size:0.8rem;
+    }
+  </style>
+</head>
+<body>
+  <h1>EcoChaser D1 관리자</h1>
+  <div class="badge">
+    <span>🗄️</span>
+    <span>로컬/배포 환경에서 D1 통계를 직접 조회하는 내부용 페이지입니다.</span>
+  </div>
+  <div class="subtitle">
+    랭킹·지역별 평균 점수·쓰레기 종류별 오답률을 한 눈에 확인하고, 필요 시 테스트 데이터를 깔끔하게 정리(리셋)할 수 있는 내부용 도구입니다.
+  </div>
+
+  <div class="panel-grid">
+    <section class="panel">
+      <h2>통합 랭킹 조회</h2>
+      <p>/api/ranking (game_scores 기반)</p>
+      <button id="btnLoadRanking">랭킹 불러오기</button>
+      <div class="status" id="statusRanking"></div>
+    </section>
+
+    <section class="panel">
+      <h2>지역별 평균 점수</h2>
+      <p>/api/scores/regions (game_scores 기반)</p>
+      <button id="btnLoadRegions">지역별 통계 불러오기</button>
+      <div class="status" id="statusRegions"></div>
+    </section>
+
+    <section class="panel">
+      <h2>쓰레기 종류별 오답률</h2>
+      <p>/api/stats/region-waste (game_waste_stats 기반)</p>
+      <div style="display:flex; flex-direction:column; gap:6px;">
+        <label for="wasteRegionId" style="font-size:0.8rem;">regionId</label>
+        <input
+          id="wasteRegionId"
+          placeholder="예: kr_seoul, kr_busan, kr_incheon, kr_cheonan 또는 비워두면 전체"
+          style="padding:4px 8px; border-radius:8px; border:1px solid #4b5563; background:#020617; color:#e5e7eb; font-size:0.85rem;"
+        />
+        <button id="btnLoadWaste" style="align-self:flex-start; margin-top:4px;">조회</button>
+        <div class="status" id="statusWaste"></div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>데이터 정리 / 리셋</h2>
+      <p>클라우드플레어 D1에 저장된 게임 기록을 간단히 정리(초기화)합니다.</p>
+      <div style="display:flex; flex-direction:column; gap:8px;">
+        <button id="btnResetScores">게임 점수 전체 리셋<br>(game_scores 비우기)</button>
+        <button id="btnResetWaste">오답 통계 전체 리셋 (game_waste_stats 비우기)</button>
+        <span style="font-size:0.75rem; color:#f97316;">※전시/테스트 전 초기화용(되돌릴 수 없음)</span>
+        <div class="status" id="statusReset"></div>
+      </div>
+    </section>
+  </div>
+
+  <section id="adminOutput">
+    <div>위의 버튼을 눌러 데이터를 조회하세요.</div>
+  </section>
+
+  <script src="js/admin.js"></script>
+</body>
+</html>
