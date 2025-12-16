@@ -5,9 +5,9 @@ pages_build_output_dir = "."
 [[d1_databases]]
 binding = "DB"
 database_name = "eco-chaser_db"
-database_id = "879b05fc-ba01-4ce5-9cf3-d8c9f7221dbc"
+database_id = "6e7ca0ff-bc68-4852-834e-932014248129"
 
 [env.dev.d1_databases]
 binding = "DB"
 database_name = "eco-chaser_db"
-database_id = "879b05fc-ba01-4ce5-9cf3-d8c9f7221dbc"
+database_id = "6e7ca0ff-bc68-4852-834e-932014248129"
