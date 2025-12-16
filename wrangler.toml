@@ -6,8 +6,3 @@ pages_build_output_dir = "."
 binding = "DB"
 database_name = "eco-chaser_db"
 database_id = "6e7ca0ff-bc68-4852-834e-932014248129"
-
-[env.dev.d1_databases]
-binding = "DB"
-database_name = "eco-chaser_db"
-database_id = "6e7ca0ff-bc68-4852-834e-932014248129"
