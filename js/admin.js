@@ -151,6 +151,9 @@ function renderRankingWithPagination(allRanking, currentPage = 1, pageSize = 10)
   const start = (safePage - 1) * pageSize;
   const pageData = allRanking.slice(start, start + pageSize);
 
+  const pageStartRank = pageData[0]?.rank ?? start + 1;
+  const pageEndRank = pageData[pageData.length - 1]?.rank ?? start + pageData.length;
+
   const paginationHtml = `
     <div id="rankingPagination" style="margin-top:8px; display:flex; gap:4px; align-items:center; flex-wrap:wrap; font-size:0.8rem;">
       <button class="page-btn" data-page="${safePage - 1}" ${safePage === 1 ? 'disabled' : ''} style="padding:2px 8px; border-radius:999px; border:none; background:#1f2937; color:#e5e7eb; cursor:${safePage === 1 ? 'default' : 'pointer'};">‹</button>
@@ -166,7 +169,7 @@ function renderRankingWithPagination(allRanking, currentPage = 1, pageSize = 10)
       <button class="page-btn" data-page="${safePage + 1}" ${safePage === totalPages ? 'disabled' : ''} style="padding:2px 8px; border-radius:999px; border:none; background:#1f2937; color:#e5e7eb; cursor:${
         safePage === totalPages ? 'default' : 'pointer'
       };">›</button>
-      <span style="margin-left:8px; color:#9ca3af;">총 ${allRanking.length}명 · 페이지 ${safePage}/${totalPages}</span>
+      <span style="margin-left:8px; color:#9ca3af;">현재 ${pageStartRank}위 ~ ${pageEndRank}위 · 총 ${allRanking.length}명 · 페이지 ${safePage}/${totalPages}</span>
     </div>
   `;
 
