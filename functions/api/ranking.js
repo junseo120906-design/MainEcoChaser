@@ -2,37 +2,39 @@ export async function onRequestGet(context) {
   const { env } = context;
 
   try {
-    // game_scores 테이블에서 전 사용자 게임 기록 조회
+    // 플레이어별로 최고 점수, 시도 횟수, 최고 점수 기록 시각을 집계
     const { results } = await env.DB.prepare(
       `SELECT
          player_name,
-         score,
          COALESCE(region_name, '기타') AS region_name,
-         timestamp
-       FROM game_scores`
+         COUNT(*)                    AS attempts,
+         MAX(score)                  AS best_score,
+         MIN(timestamp)              AS first_timestamp
+       FROM game_scores
+       GROUP BY player_name, region_name`
     ).all();
 
-    const scores = results || [];
+    const rows = results || [];
 
-    // 점수 높은 순, 동점이면 최신 기록 우선
-    const sorted = scores.sort((a, b) => {
-      const aScore = Number(a.score) || 0;
-      const bScore = Number(b.score) || 0;
+    // 최고 점수 내림차순, 동점 시 더 이른 기록 시각(= 먼저 달성한 사람) 우선
+    const sorted = rows.sort((a, b) => {
+      const aScore = Number(a.best_score) || 0;
+      const bScore = Number(b.best_score) || 0;
       if (aScore !== bScore) return bScore - aScore;
 
-      const aTime = new Date(a.timestamp).getTime() || 0;
-      const bTime = new Date(b.timestamp).getTime() || 0;
-      return bTime - aTime;
+      const aTime = new Date(a.first_timestamp).getTime() || 0;
+      const bTime = new Date(b.first_timestamp).getTime() || 0;
+      return aTime - bTime;
     });
 
     const top = sorted.slice(0, 10);
 
-    // 프론트에서 기대하는 형태로 변환
     const ranking = top.map((row, idx) => ({
       rank: idx + 1,
       nickname: row.player_name || 'Unknown',
-      score: Number(row.score) || 0,
-      mistakes: 0, // 현재는 오답 수를 별도 저장하지 않으므로 0으로 둠
+      score: Number(row.best_score) || 0,
+      attempts: Number(row.attempts) || 0,
+      bestTime: row.first_timestamp || null,
       region: row.region_name,
     }));
 

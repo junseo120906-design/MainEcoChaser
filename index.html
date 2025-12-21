@@ -4,8 +4,6 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>EcoChaser</title>
-  <link rel="shortcut icon" href="image/favicon.ico" type="image/x-icon">
-  <link rel="icon" href="image/favicon.ico" type="image/x-icon">
   <link rel="stylesheet" href="css/style.css"/>
   <style>
     /* 필요 시 기존 모드 스타일은 지금은 사용하지 않아도 됨 */
@@ -58,7 +56,7 @@
         <img src="image/Logo.png" alt="EcoChaser Logo" class="logo-img">
       </a>
       <div class="nav-actions">
-        <a href="game/ecochaserGame/index.html" class="btn btn-primary">지금 플레이하기</a>
+        <a href="game/index.html" class="btn btn-primary">지금 플레이하기</a>
       </div>
     </div>
   </nav>
@@ -74,7 +72,7 @@
               러너 게임을 즐기며 자연스럽게 <br>지역별 분리배출 규칙을 배워보세요!
             </p>
             <div class="cta-buttons">
-              <a href="game/ecochaserGame/index.html" class="btn btn-primary">지금 플레이하기</a>
+              <a href="game/index.html" class="btn btn-primary">지금 플레이하기</a>
               <a href="#ranking-section" class="btn btn-secondary">랭킹 보기</a>
               <a href="#region-stats-section" class="btn btn-secondary">지역별 통계 보기</a>
             </div>
@@ -127,8 +125,7 @@
         </div>
         <div class="intro-header-right">
           <h3>
-            <strong>Eco Chaser</strong>는 외국인 유학생과 기숙사생이 지역별 분리수거 기준을 <br>자연스럽게 익힐 수 있도록 설계된 러너 게임입니다.
-            <br>도시를 뛰며 지역별로 환경 인식 개선에 참여하세요!
+            <strong>Eco Chaser</strong>는 외국인 유학생과 기숙사생이 지역별 분리수거 기준을 자연스럽게 익힐 수 있도록 설계된 러너 게임입니다. 환경 인식 개선에 참여하세요!
           </h3>
         </div>
       </div>
@@ -136,22 +133,22 @@
         <!-- 1. 행동 변화를 유도하는 실전 학습 경험 -->
         <article class="intro-card intro-card--behavior" data-intro-index="0">
           <h3><span class="intro-card-icon">🌳</span>
-            <strong>행동 변화를 유도하는 <br>실전 학습 경험</strong></h3>
-          <p class="intro-card-kicker">🌱 생활 속에서 행동을 바꾸게 <br>만드는 실전형 러닝!</p>
+            <strong>행동 변화를 유도하는 실전 학습</strong></h3>
+          <p class="intro-card-kicker">🌱 생활 속에서 행동을 바꾸게 만드는 실전형 러닝!</p>
         </article>
 
         <!-- 2. 차별화된 데이터 기반 교육 시스템 -->
         <article class="intro-card intro-card--data" data-intro-index="1">
           <h3><span class="intro-card-icon">🧠</span>
-            <strong>차별화된 데이터 기반 <br>교육 시스템</strong></h3>
-          <p class="intro-card-kicker">📊 학습 데이터를 기반으로 더 <br>똑똑하게 피드백!</p>
+            <strong>차별화된 데이터 기반 교육 시스템</strong></h3>
+          <p class="intro-card-kicker">📊 학습 데이터를 기반으로 더 똑똑하게 피드백!</p>
         </article>
 
         <!-- 3. 몰입도를 높이는 전략적 게임성 -->
         <article class="intro-card intro-card--gameplay" data-intro-index="2">
           <h3><span class="intro-card-icon">🎮</span>
-            <strong>몰입도를 높이는 <br>전략적 게임성</strong></h3>
-          <p class="intro-card-kicker">🕹️ 게임처럼 재밌지만, 끝까지 남는 건 <br>환경 감수성!</p>
+            <strong>몰입도를 높이는 전략적 게임성</strong></h3>
+          <p class="intro-card-kicker">🕹️ 게임처럼 재밌지만, 끝까지 남는 건 환경 감수성!</p>
         </article>
       </div>
     </section>
@@ -246,50 +243,45 @@
       </div>
 
       <div id="regionStatsSummary" class="stats-summary">
-        <p>지역을 선택하면 플레이 횟수, 평균 점수, 최고 점수 등의 통계가 여기에 표시됩니다.</p>
+        <p>지역을 선택하면 해당 지역의 플레이 횟수, 평균 점수, 최고·최저 점수와 함께 학습 난이도 통계를 확인할 수 있습니다.</p>
       </div>
 
       <div class="stats-charts">
-        <section class="stats-chart-card" id="regionComparisonChart" aria-label="지역별 평균 오답률 그래프">
+        <section class="stats-chart-card" id="regionComparisonChart" aria-label="지역별 평균 실천율 그래프">
           <header class="stats-chart-header">
-            <h3>지역별 평균 오답률</h3>
-            <p class="stats-chart-subtitle">최근 기록 기준 상위 지역의 추정 오답률</p>
+            <h3>지역별 평균 실천율</h3>
+            <p class="stats-chart-subtitle">최근 기록을 바탕으로, 지역별 분리배출 규칙을 얼마나 잘 지키고 있는지(실천율)를 순위로 비교합니다.</p>
           </header>
-          <div class="stats-chart-body">
-            <div class="stats-chart-yaxis">
-              <span>100%</span>
-              <span>80%</span>
-              <span>60%</span>
-              <span>40%</span>
-              <span>20%</span>
-              <span>0%</span>
-            </div>
-            <div class="stats-chart-bars" data-chart="regions">
-              <!-- JS에서 막대가 동적으로 채워집니다. -->
+
+          <div class="stats-chart-body stats-chart-body--ranking">
+            <div class="stats-hbar-list" data-chart="region-ranking">
+              <!-- JS에서 수평 막대(순위표)가 동적으로 채워집니다. -->
             </div>
           </div>
-          <p class="stats-chart-caption">지역별 평균 오답률을 통해 분리배출 안내가 더 필요한 지역을 파악할 수 있습니다.</p>
+          <p class="stats-chart-caption">막대가 길수록 실천율이 높은 지역입니다. 위쪽에 배치된 지역일수록 실천율이 높은 지역입니다.</p>
         </section>
 
         <section class="stats-chart-card" id="wasteTypeChart" aria-label="분류별 오답률 그래프">
           <header class="stats-chart-header">
             <h3>분리배출 항목별 오답률</h3>
-            <p class="stats-chart-subtitle">선택한 지역에서 어떤 분리수거 항목이 가장 어려운지 보여줍니다.</p>
+            <p class="stats-chart-subtitle">선택한 지역에서 어떤 분리수거 항목의 정답률이 낮은지, 즉 어떤 쓰레기가 가장 헷갈리는지 보여줍니다.</p>
           </header>
           <div class="stats-chart-body">
             <div class="stats-chart-yaxis">
               <span>100%</span>
+              <span>95%</span>
+              <span>90%</span>
+              <span>85%</span>
               <span>80%</span>
-              <span>60%</span>
-              <span>40%</span>
-              <span>20%</span>
-              <span>0%</span>
+              <span>75%</span>
+              <span class="stats-chart-axis-label">오답률(%)</span>
             </div>
+
             <div class="stats-chart-bars" data-chart="waste-types">
               <!-- JS에서 막대가 동적으로 채워집니다. -->
             </div>
           </div>
-          <p class="stats-chart-caption">일반 쓰레기, 음식물 쓰레기, 재활용 등 어떤 항목의 실천률이 낮은지 한눈에 비교할 수 있습니다.</p>
+          <p class="stats-chart-caption">일반 쓰레기, 음식물 쓰레기, 재활용 항목 중 어떤 부분에서 실수가 많이 일어나는지 확인하여, 지역 맞춤형 안내 포인트를 발견할 수 있습니다.</p>
         </section>
       </div>
 
@@ -305,7 +297,7 @@
         </thead>
         <tbody id="regionStatsTableBody">
           <tr>
-            <td colspan="5" style="text-align:center;">데이터를 불러오는 중...</td>
+            <td colspan="5" style="text-align:center;">데이터를 불러오는 중입니다...</td>
           </tr>
         </tbody>
       </table>

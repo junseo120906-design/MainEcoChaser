@@ -189,7 +189,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 { x: 300, y: 560, width: 20, height: 20, dx: 1.5, color: '#8e44ad', minX: 250, maxX: 400 }
             ],
             startPos: { player: { x: 100, y: 500 }, bot: { x: 700, y: 500 } },
-            trashCanPos: { x: 700, y: 520 },
+            // 쓰레기통은 아래 안전 좌표 중 하나에서 랜덤 배치
+            trashCanCandidates: [
+                { x: 700, y: 520 },
+                { x: 620, y: 520 },
+                { x: 540, y: 520 }
+            ],
             bgDrawFunc: drawCityBackground
         },
         { // 스테이지 2: 학교 (MODIFIED)
@@ -219,7 +224,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 { x: 400, y: 280, width: 20, height: 20, dx: 2, color: '#8e44ad', minX: 350, maxX: 550 } // (MOVED) 공중 장애물
             ],
             startPos: { player: { x: 50, y: 500 }, bot: { x: 750, y: 500 } },
-            trashCanPos: { x: 730, y: 520 }, // (MODIFIED) 오른쪽 지상으로 이동
+            // 쓰레기통은 아래 안전 좌표 중 하나에서 랜덤 배치
+            trashCanCandidates: [
+                { x: 730, y: 520 },
+                { x: 640, y: 520 },
+                { x: 560, y: 520 }
+            ],
             bgDrawFunc: drawSchoolBackground
         }
     ];
@@ -703,10 +713,43 @@ document.addEventListener('DOMContentLoaded', function() {
         resetPlayerPosition(stage.startPos.player);
         resetBotPosition(stage.startPos.bot);
         
-        // 쓰레기통 위치
-        trashCan.x = stage.trashCanPos.x;
-        trashCan.y = stage.trashCanPos.y;
-        
+        // 쓰레기통 위치: 후보 좌표 중에서 플랫폼/장애물과 겹치지 않는 위치를 랜덤 선택
+        const candidates = Array.isArray(stage.trashCanCandidates) && stage.trashCanCandidates.length
+            ? [...stage.trashCanCandidates]
+            : (stage.trashCanPos ? [stage.trashCanPos] : [{ x: trashCan.x, y: trashCan.y }]);
+
+        // 후보 순서를 랜덤 셔플
+        for (let i = candidates.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            const tmp = candidates[i];
+            candidates[i] = candidates[j];
+            candidates[j] = tmp;
+        }
+
+        function isValidTrashCanPos(pos) {
+            const rect = { x: pos.x, y: pos.y, width: trashCan.width, height: trashCan.height };
+            // 플랫폼과 겹치지 않도록 검사
+            for (const p of platforms) {
+                if (AABBCollision(rect, p)) return false;
+            }
+            // 장애물과도 겹치지 않도록 검사
+            for (const obs of obstacles) {
+                if (AABBCollision(rect, obs)) return false;
+            }
+            return true;
+        }
+
+        let chosen = candidates[0];
+        for (const cand of candidates) {
+            if (isValidTrashCanPos(cand)) {
+                chosen = cand;
+                break;
+            }
+        }
+
+        trashCan.x = chosen.x;
+        trashCan.y = chosen.y;
+
         // UI 업데이트
         if (stageEl) stageEl.textContent = `STAGE ${currentStage + 1}: ${stage.levelName}`;
     }

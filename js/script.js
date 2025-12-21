@@ -9,6 +9,7 @@
  * 이 함수는 [4]번의 applyModeFromHash에 의해 호출됩니다.
  */
 async function loadRanking() {
+
     // 랭킹을 표시할 곳이 '.leaderboard-list'가 맞는지 확인
     const leaderboardList = document.querySelector('.leaderboard-list');
     
@@ -28,7 +29,12 @@ async function loadRanking() {
         }
 
         const scores = data.ranking;
-        // 서버에서 이미 정렬해서 보내주므로 클라이언트에서 정렬할 필요가 없습니다。
+        // 서버에서 이미 정렬해서 보내주므로 클라이언트에서 정렬할 필요가 없습니다.
+
+        // 이전 랭킹 데이터를 보관해서, 변경된 항목에만 하이라이트를 줄 수 있도록 함
+        const prevRanking = Array.isArray(window.__prevRanking)
+            ? window.__prevRanking
+            : [];
 
         leaderboardList.innerHTML = '';
 
@@ -40,12 +46,25 @@ async function loadRanking() {
         const header = document.createElement('div');
         header.className = 'leaderboard-header';
         header.innerHTML = `
-            <span>카테고리</span>
             <span>순위</span>
             <span>닉네임</span>
-            <span style="text-align: right;">점수</span>
+            <span>점수</span>
+            <span>시도(회)</span>
+            <span style="text-align: right;">기록 시각</span>
         `;
         leaderboardList.appendChild(header);
+
+        let prevTopKey = null;
+        if (prevRanking.length > 0) {
+            const p0 = prevRanking[0];
+            if (p0) prevTopKey = `${p0.nickname || ''}|${p0.score || 0}`;
+        }
+
+        const currentNickname =
+            localStorage.getItem('nickname') ||
+            localStorage.getItem('userNickname') ||
+            localStorage.getItem('loggedInNickname') ||
+            null;
 
         scores.forEach((entry, index) => {
             const rankItem = document.createElement('div');
@@ -55,23 +74,80 @@ async function loadRanking() {
             if (index === 1) rankItem.classList.add('silver');
             if (index === 2) rankItem.classList.add('bronze');
 
-            const trophy = index < 3 ? ' <span class="trophy">🏆</span>' : '';
-            const category = entry.category ?? (
-              entry.score >= 1400 ? '레전드' :
-              entry.score >= 1200 ? '마스터' :
-              entry.score >= 900  ? '다이아'  :
-              entry.score >= 700  ? '플래티넘' :
-              entry.score >= 500  ? '골드' : '브론즈'
-            );
+            if (currentNickname && entry.nickname === currentNickname) {
+                rankItem.classList.add('is-current-user');
+            }
+
+            let trophy = '';
+            if (index === 0) trophy = ' <span class="trophy trophy-gold">🥇</span>';
+            else if (index === 1) trophy = ' <span class="trophy trophy-silver">🥈</span>';
+            else if (index === 2) trophy = ' <span class="trophy trophy-bronze">🥉</span>';
+
+            const attempts = Number(entry.attempts ?? entry.plays ?? 0);
+            let bestTimeText = '-';
+            if (entry.bestTime) {
+                const d = new Date(entry.bestTime);
+                if (!isNaN(d.getTime())) {
+                    const yyyy = d.getFullYear();
+                    const mm = String(d.getMonth() + 1).padStart(2, '0');
+                    const dd = String(d.getDate()).padStart(2, '0');
+                    const hh = String(d.getHours()).padStart(2, '0');
+                    const mi = String(d.getMinutes()).padStart(2, '0');
+                    bestTimeText = `${yyyy}.${mm}.${dd} ${hh}:${mi}`;
+                }
+            }
 
             rankItem.innerHTML = `
-                <span class="category">${category}</span>
                 <span class="rank">${index + 1}${trophy}</span>
                 <span class="nickname">${entry.nickname}</span>
                 <span class="score">${entry.score}</span>
+                <span class="plays">${attempts.toLocaleString('ko-KR')}회</span>
+                <span class="time">${bestTimeText}</span>
             `;
+
+            // 이전 랭킹과 비교해서 내용이 바뀐 경우만 하이라이트
+            const prev = prevRanking[index];
+            const isSame =
+                prev &&
+                prev.nickname === entry.nickname &&
+                Number(prev.score) === Number(entry.score);
+
+            if (!isSame && prevRanking.length > 0) {
+                rankItem.classList.add('is-new');
+
+                // 1등이 바뀐 경우에는 추가로 bounce 효과
+                if (index === 0) {
+                    const newTopKey = `${entry.nickname || ''}|${entry.score || 0}`;
+                    if (newTopKey !== prevTopKey) {
+                        rankItem.classList.add('top-changed');
+                    }
+                }
+            }
             leaderboardList.appendChild(rankItem);
         });
+
+        // 이번 랭킹을 다음 비교를 위해 저장
+        window.__prevRanking = scores.map((s) => ({
+            nickname: s.nickname,
+            score: Number(s.score),
+        }));
+
+        // 메타 정보 (동점 기준 및 마지막 업데이트 시간)
+        const meta = document.createElement('div');
+        meta.className = 'leaderboard-meta';
+        const now = new Date();
+        const formatted = now.toLocaleString('ko-KR', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+        });
+        meta.innerHTML = `
+            <div class="leaderboard-meta-text">동점일 경우 오답 수가 적은 순, 그다음 기록 시간이 빠른 순으로 순위가 결정됩니다.</div>
+            <div class="leaderboard-meta-updated">마지막 업데이트: ${formatted}</div>
+        `;
+        leaderboardList.appendChild(meta);
     } catch (error) {
         console.error('랭킹 요청 실패:', error);
         leaderboardList.innerHTML = '<div>서버 통신에 실패했습니다.</div>';
@@ -120,7 +196,8 @@ async function loadRegionStats() {
         }
 
         // average_score가 높을수록 오답률이 낮다고 가정하고 0~1 범위의 "추정 오답률"로 변환
-        const MAX_SCORE = 1500; // 점수 상한 가정값 (필요하면 조정)
+        const MAX_SCORE = 100; // 실제 게임 점수 상한 (0~100점)
+
         regionStatsFromServer = raw.map((row) => {
             const avg = Number(row.average_score ?? 0);
             const clamped = Math.max(0, Math.min(avg, MAX_SCORE));
@@ -140,56 +217,169 @@ async function loadRegionStats() {
     }
 }
 
-// 더미 데이터: 분리배출 항목별 오답률 (아직 D1 스키마가 없어 placeholder 유지)
-const demoWasteTypeStats = {
-    all: [
-        { label: '일반', wrongRate: 0.35 },
-        { label: '플라스틱', wrongRate: 0.48 },
-        { label: '종이', wrongRate: 0.22 },
-        { label: '유리', wrongRate: 0.3 },
-        { label: '음식물', wrongRate: 0.55 },
-    ],
-};
+// 분리배출 항목별 오답률은 이제 D1의 game_waste_stats 테이블을 사용하는
+// /api/stats/region-waste 엔드포인트에서 직접 불러옵니다.
 
-// 선택된 지역 키에 따라 막대 그래프 렌더링
+// 선택된 지역 키에 따라 그래프 렌더링 (왼쪽: 순위형 수평 막대, 오른쪽: 수직 막대)
 async function renderRegionCharts(selectedRegionKey = 'all') {
-    const regionBarsContainer = document.querySelector('.stats-chart-bars[data-chart="regions"]');
+    const regionRankingContainer = document.querySelector('.stats-hbar-list[data-chart="region-ranking"]');
     const wasteBarsContainer = document.querySelector('.stats-chart-bars[data-chart="waste-types"]');
 
-    if (!regionBarsContainer || !wasteBarsContainer) return;
+    if (!regionRankingContainer || !wasteBarsContainer) return;
 
     if (regionStatsFromServer.length === 0) {
         await loadRegionStats();
     }
 
-    // 1) 왼쪽: 지역별 평균 오답률 (모든 지역 비교)
-    regionBarsContainer.innerHTML = '';
-    (regionStatsFromServer.length ? regionStatsFromServer : []).forEach((region) => {
-        const heightPct = Math.round(region.wrongRate * 100);
-        const bar = document.createElement('div');
-        bar.className = 'stats-bar';
-        bar.innerHTML = `
-            <div class="stats-bar-column" style="height:${heightPct}%;"></div>
-            <div class="stats-bar-value">${heightPct}%</div>
-            <div class="stats-bar-label">${region.label}</div>
-        `;
-        regionBarsContainer.appendChild(bar);
-    });
+    // 1) 왼쪽: 지역별 평균 오답률 → 순위형 수평 막대 그래프 (실천률 기준)
+    const regionsToShow = regionStatsFromServer.length ? [...regionStatsFromServer] : [];
 
-    // 2) 오른쪽: 분리배출 항목별 오답률 (지금은 데모 데이터)
-    const wasteData = demoWasteTypeStats[selectedRegionKey] || demoWasteTypeStats.all;
+    regionRankingContainer.innerHTML = '';
+
+    if (!regionsToShow.length) {
+        const msg = document.createElement('div');
+        msg.textContent = '지역 통계 데이터가 아직 없습니다.';
+        msg.style.color = '#9ca3af';
+        msg.style.fontSize = '0.9rem';
+        regionRankingContainer.appendChild(msg);
+    } else {
+        // 실천률이 높은 순(정답률이 높은 순)으로 정렬
+        regionsToShow.sort((a, b) => {
+            const aw = Math.max(0, Math.min(1, a.wrongRate ?? 0));
+            const bw = Math.max(0, Math.min(1, b.wrongRate ?? 0));
+            const ac = 1 - aw;
+            const bc = 1 - bw;
+            return bc - ac; // 실천률 높은 순
+        });
+
+        const correctPercents = regionsToShow.map((r) => {
+            const wrong = Math.max(0, Math.min(1, r.wrongRate ?? 0));
+            const correct = 1 - wrong;
+            return Math.round(correct * 100);
+        });
+        const minCorrect = Math.min(...correctPercents);
+        const maxCorrect = Math.max(...correctPercents);
+
+        const toDisplayWidth = (value) => {
+            if (!Number.isFinite(value)) return 0;
+            if (maxCorrect === minCorrect) return 60; // 전부 같으면 적당한 길이
+            const ratio = (value - minCorrect) / (maxCorrect - minCorrect); // 0~1 (실천률 낮은 곳이 0)
+            return 30 + ratio * 70; // 30% ~ 100%
+        };
+
+        regionsToShow.forEach((region, idx) => {
+            const correct = correctPercents[idx];
+            const displayWidth = toDisplayWidth(correct);
+
+            const row = document.createElement('div');
+            row.className = 'stats-hbar-row';
+
+            if (correct === maxCorrect) {
+                row.classList.add('is-best-region');
+            }
+            if (correct === minCorrect) {
+                row.classList.add('is-worst-region');
+            }
+
+            const count = Number(region.count ?? 0);
+
+            row.innerHTML = `
+                <div class="stats-hbar-label">${region.label}</div>
+                <div class="stats-hbar-bar-wrap">
+                    <div class="stats-hbar-bar"></div>
+                </div>
+                <div class="stats-hbar-value">
+                    <span class="stats-hbar-main">실천률 ${correct}%</span>
+                    <span class="stats-hbar-sub">플레이 N=${count.toLocaleString('ko-KR')}</span>
+                </div>
+            `;
+
+            regionRankingContainer.appendChild(row);
+
+            const barEl = row.querySelector('.stats-hbar-bar');
+            if (barEl) {
+                barEl.style.setProperty('--target-width', `${displayWidth}%`);
+                barEl.classList.remove('is-active');
+                barEl.style.transitionDelay = `${idx * 60}ms`;
+                requestAnimationFrame(() => {
+                    barEl.classList.add('is-active');
+                });
+            }
+        });
+    }
+
+    // 2) 오른쪽: 분리배출 항목별 오답률 (D1 기반)
     wasteBarsContainer.innerHTML = '';
-    wasteData.forEach((item) => {
-        const heightPct = Math.round(item.wrongRate * 100);
-        const bar = document.createElement('div');
-        bar.className = 'stats-bar';
-        bar.innerHTML = `
-            <div class="stats-bar-column" style="height:${heightPct}%;"></div>
-            <div class="stats-bar-value">${heightPct}%</div>
-            <div class="stats-bar-label">${item.label}</div>
-        `;
-        wasteBarsContainer.appendChild(bar);
-    });
+
+    try {
+        const params = selectedRegionKey && selectedRegionKey !== 'all'
+            ? `?regionId=${encodeURIComponent(selectedRegionKey)}`
+            : '';
+        const res = await fetch(`/api/stats/region-waste${params}`);
+        const rawWaste = await res.json();
+
+        const wasteData = Array.isArray(rawWaste) ? rawWaste : [];
+
+        if (!wasteData.length) {
+
+            const msg = document.createElement('div');
+            msg.textContent = '선택한 지역의 오답 통계가 아직 없습니다.';
+            msg.style.color = '#9ca3af';
+            msg.style.fontSize = '0.9rem';
+            wasteBarsContainer.appendChild(msg);
+        } else {
+            // 오답률 70~100% 구간을 확대해서 보여주기 위해, 70%를 기준선으로 사용
+            const BASE = 70;
+            const rawPercents = wasteData.map((item) => {
+                const rate = Number(item.wrongRate ?? 0);
+                return Math.max(0, Math.min(100, Math.round(rate * 100)));
+            });
+            const maxRate = Math.max(...rawPercents);
+
+            const toDisplayHeight = (value) => {
+                if (!Number.isFinite(value)) return 0;
+                const clamped = Math.max(BASE, Math.min(100, value));
+                const ratio = (clamped - BASE) / (100 - BASE); // 0~1 (70~100%)
+                return 15 + ratio * 85; // 15%~100%
+            };
+
+            wasteData.forEach((item, idx) => {
+                const label = item.wasteType || item.label || '기타';
+                const percent = rawPercents[idx];
+                const displayHeight = toDisplayHeight(percent);
+
+                const bar = document.createElement('div');
+                bar.className = 'stats-bar';
+                if (percent === maxRate) {
+                    bar.classList.add('is-worst-waste');
+                }
+
+                bar.innerHTML = `
+                    <div class="stats-bar-column"></div>
+                    <div class="stats-bar-value">${percent}%</div>
+                    <div class="stats-bar-label">${label}</div>
+                `;
+                wasteBarsContainer.appendChild(bar);
+
+                const column = bar.querySelector('.stats-bar-column');
+                if (column) {
+                    column.style.setProperty('--target-height', `${displayHeight}%`);
+                    column.classList.remove('is-active');
+                    column.style.transitionDelay = `${idx * 40}ms`;
+                    requestAnimationFrame(() => {
+                        column.classList.add('is-active');
+                    });
+                }
+            });
+        }
+    } catch (err) {
+        console.error('분리배출 항목별 오답률 불러오기 실패:', err);
+        const msg = document.createElement('div');
+        msg.textContent = '오답 통계를 불러오는 중 오류가 발생했습니다.';
+        msg.style.color = '#f97316';
+        msg.style.fontSize = '0.9rem';
+        wasteBarsContainer.appendChild(msg);
+    }
 }
 
 // Scroll reveal & hero load-in animations
@@ -386,6 +576,12 @@ document.addEventListener('DOMContentLoaded', () => {
         // 통합 랭킹 섹션이 있다면, 페이지 진입 시 랭킹 데이터를 바로 로드
         if (leaderboardList) {
             loadRanking();
+            // 일정 주기로 랭킹을 다시 불러와 실시간 느낌을 줌
+            setInterval(() => {
+                if (document.body.contains(leaderboardList)) {
+                    loadRanking();
+                }
+            }, 15000); // 15초마다 갱신
         }
 
         // 지역별 통계 그래프 초기 렌더링 (전체 기준)
